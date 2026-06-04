@@ -1,62 +1,80 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-/// @title GuildPermissions — ERC-7710-inspired delegation of spend permissions
-/// Allows a Smart Account (or coordinator) to delegate payment permissions to sub-agents.
+import "./Events.sol";
+
+/// @title GuildPermissions — ERC-7710-inspired spend permission delegation
 contract GuildPermissions {
+    // ── Errors ────────────────────────────────────────────────────────────────
+    error AllowanceMismatch();
+    error NotGrantee();
+    error NotAuthorized();
+    error PermissionRevoked();
+    error PermissionExpired();
+    error ExceedsAllowance();
+    error AlreadyRevoked();
+    error TransferFailed();
+
+    // ── State ─────────────────────────────────────────────────────────────────
     struct Permission {
         address granter;
         address grantee;
-        uint256 allowance;  // max spend in wei
+        uint256 allowance;
         uint256 spent;
         uint256 expiry;
-        bool revoked;
+        bool    revoked;
     }
 
     uint256 public permCount;
     mapping(uint256 => Permission) public permissions;
     mapping(address => uint256[]) public granteePerms;
 
-    event PermissionGranted(uint256 indexed permId, address indexed granter, address indexed grantee, uint256 allowance, uint256 expiry);
-    event PermissionUsed(uint256 indexed permId, uint256 amount);
-    event PermissionRevoked(uint256 indexed permId);
+    // ── Views ─────────────────────────────────────────────────────────────────
+    function getGranteePerms(address grantee) external view returns (uint256[] memory) {
+        return granteePerms[grantee];
+    }
 
-    function grantPermission(address grantee, uint256 allowance, uint256 duration) external payable returns (uint256) {
-        require(msg.value == allowance, "must fund allowance");
+    // ── Mutations ─────────────────────────────────────────────────────────────
+    /// @notice Escrows ETH and creates a spend permission for `grantee`.
+    function grantPermission(address grantee, uint256 allowance, uint256 duration)
+        external
+        payable
+        returns (uint256)
+    {
+        if (msg.value != allowance) revert AllowanceMismatch();
         uint256 permId = permCount++;
-        permissions[permId] = Permission(msg.sender, grantee, allowance, 0, block.timestamp + duration, false);
+        uint256 expiry = block.timestamp + duration;
+        permissions[permId] = Permission(msg.sender, grantee, allowance, 0, expiry, false);
         granteePerms[grantee].push(permId);
-        emit PermissionGranted(permId, msg.sender, grantee, allowance, block.timestamp + duration);
+        emit PermissionGranted(permId, msg.sender, grantee, allowance, expiry);
         return permId;
     }
 
+    /// @notice Grantee spends from the permission, transferring ETH to `recipient`.
     function usePermission(uint256 permId, address payable recipient, uint256 amount) external {
         Permission storage p = permissions[permId];
-        require(msg.sender == p.grantee, "not grantee");
-        require(!p.revoked, "revoked");
-        require(block.timestamp <= p.expiry, "expired");
-        require(p.spent + amount <= p.allowance, "exceeds allowance");
+        if (msg.sender != p.grantee)          revert NotGrantee();
+        if (p.revoked)                         revert PermissionRevoked();
+        if (block.timestamp > p.expiry)        revert PermissionExpired();
+        if (p.spent + amount > p.allowance)    revert ExceedsAllowance();
 
         p.spent += amount;
-        (bool success,) = recipient.call{value: amount}("");
-        require(success, "transfer failed");
-        emit PermissionUsed(permId, amount);
+        (bool ok,) = recipient.call{value: amount}("");
+        if (!ok) revert TransferFailed();
+        emit PermissionUsed(permId, recipient, amount);
     }
 
+    /// @notice Granter or grantee revokes the permission; unspent ETH returned to granter.
     function revokePermission(uint256 permId) external {
         Permission storage p = permissions[permId];
-        require(msg.sender == p.granter || msg.sender == p.grantee, "not authorized");
-        require(!p.revoked, "already revoked");
+        if (msg.sender != p.granter && msg.sender != p.grantee) revert NotAuthorized();
+        if (p.revoked) revert AlreadyRevoked();
         p.revoked = true;
-        uint256 remaining = p.allowance - p.spent;
-        if (remaining > 0) {
-            (bool success,) = payable(p.granter).call{value: remaining}("");
-            require(success, "refund failed");
+        uint256 refund = p.allowance - p.spent;
+        if (refund > 0) {
+            (bool ok,) = payable(p.granter).call{value: refund}("");
+            if (!ok) revert TransferFailed();
         }
-        emit PermissionRevoked(permId);
-    }
-
-    function getGranteePerms(address grantee) external view returns (uint256[] memory) {
-        return granteePerms[grantee];
+        emit PermissionRevoked(permId, refund);
     }
 }

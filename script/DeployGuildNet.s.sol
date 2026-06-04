@@ -10,13 +10,15 @@ contract DeployGuildNet is Script {
     function run() external {
         vm.startBroadcast();
 
-        AgentRegistry   registry    = new AgentRegistry();
-        TaskCoordinator coordinator = new TaskCoordinator(address(registry));
-        GuildPermissions perms      = new GuildPermissions();
+        AgentRegistry    registry    = new AgentRegistry();
+        GuildPermissions perms       = new GuildPermissions();
+        // coordinator EOA = the deployer; swap for a dedicated address in production
+        TaskCoordinator  coordinator = new TaskCoordinator(address(registry), address(perms), msg.sender);
 
         console.log("AgentRegistry:    ", address(registry));
-        console.log("TaskCoordinator:  ", address(coordinator));
         console.log("GuildPermissions: ", address(perms));
+        console.log("TaskCoordinator:  ", address(coordinator));
+        console.log("Coordinator EOA:  ", msg.sender);
 
         vm.stopBroadcast();
     }

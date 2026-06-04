@@ -45,7 +45,7 @@ contract GuildPermissions {
 
     function revokePermission(uint256 permId) external {
         Permission storage p = permissions[permId];
-        require(msg.sender == p.granter, "not granter");
+        require(msg.sender == p.granter || msg.sender == p.grantee, "not authorized");
         require(!p.revoked, "already revoked");
         p.revoked = true;
         uint256 remaining = p.allowance - p.spent;

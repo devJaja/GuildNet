@@ -1,19 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import "./Events.sol";
+import "./lib/Events.sol";
+import "./lib/Errors.sol";
 
 /// @title GuildPermissions — ERC-7710-inspired spend permission delegation
 contract GuildPermissions {
-    // ── Errors ────────────────────────────────────────────────────────────────
-    error AllowanceMismatch();
-    error NotGrantee();
-    error NotAuthorized();
-    error PermissionRevoked();
-    error PermissionExpired();
-    error ExceedsAllowance();
-    error AlreadyRevoked();
-    error TransferFailed();
 
     // ── State ─────────────────────────────────────────────────────────────────
     struct Permission {

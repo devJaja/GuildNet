@@ -3,19 +3,11 @@ pragma solidity ^0.8.25;
 
 import {AgentRegistry} from "./AgentRegistry.sol";
 import {GuildPermissions} from "./GuildPermissions.sol";
-import "./Events.sol";
+import "./lib/Events.sol";
+import "./lib/Errors.sol";
 
 /// @title TaskCoordinator — coordinates agent hiring and payment routing
 contract TaskCoordinator {
-    // ── Errors ────────────────────────────────────────────────────────────────
-    error ZeroBudget();
-    error NotCoordinator();
-    error NotAuthorized();
-    error TaskAlreadyCompleted();
-    error AgentAlreadyPaid();
-    error AgentInactive();
-    error InsufficientBudget();
-    error RefundFailed();
 
     // ── State ─────────────────────────────────────────────────────────────────
     AgentRegistry    public immutable registry;

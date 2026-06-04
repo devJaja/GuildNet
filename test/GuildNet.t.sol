@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {AgentRegistry} from "../src/AgentRegistry.sol";
 import {TaskCoordinator} from "../src/TaskCoordinator.sol";
 import {GuildPermissions} from "../src/GuildPermissions.sol";
+import "../src/lib/Errors.sol";
 
 contract GuildNetTest is Test {
     AgentRegistry    registry;
@@ -55,12 +56,12 @@ contract GuildNetTest is Test {
     }
 
     function test_register_emptyCapabilityReverts() public {
-        vm.expectRevert(AgentRegistry.EmptyCapability.selector);
+        vm.expectRevert(EmptyCapability.selector);
         registry.register("https://x.ai", "", 0);
     }
 
     function test_update_notRegisteredReverts() public {
-        vm.expectRevert(AgentRegistry.NotRegistered.selector);
+        vm.expectRevert(NotRegistered.selector);
         registry.update("https://x.ai", 1);
     }
 
@@ -80,7 +81,7 @@ contract GuildNetTest is Test {
         vm.prank(user);
         uint256 taskId = coordinator.createTask{value: 0.05 ether}("task", 1 days);
         vm.prank(user);
-        vm.expectRevert(TaskCoordinator.NotCoordinator.selector);
+        vm.expectRevert(NotCoordinator.selector);
         coordinator.hireAgent(taskId, research);
     }
 
@@ -109,7 +110,7 @@ contract GuildNetTest is Test {
         coordinator.completeTask(taskId);
         // second call must revert — proves task is marked completed
         vm.prank(coordEOA);
-        vm.expectRevert(TaskCoordinator.TaskAlreadyCompleted.selector);
+        vm.expectRevert(TaskAlreadyCompleted.selector);
         coordinator.completeTask(taskId);
     }
 
@@ -119,7 +120,7 @@ contract GuildNetTest is Test {
         vm.prank(coordEOA);
         coordinator.hireAgent(taskId, research);
         vm.prank(coordEOA);
-        vm.expectRevert(TaskCoordinator.AgentAlreadyPaid.selector);
+        vm.expectRevert(AgentAlreadyPaid.selector);
         coordinator.hireAgent(taskId, research);
     }
 
@@ -168,14 +169,14 @@ contract GuildNetTest is Test {
 
         skip(2 hours);
         vm.prank(coordEOA);
-        vm.expectRevert(GuildPermissions.PermissionExpired.selector);
+        vm.expectRevert(PermissionExpired.selector);
         permissions.usePermission(permId, payable(research), 0.01 ether);
     }
 
     function test_allowanceMismatchReverts() public {
         vm.deal(user, 1 ether);
         vm.prank(user);
-        vm.expectRevert(GuildPermissions.AllowanceMismatch.selector);
+        vm.expectRevert(AllowanceMismatch.selector);
         permissions.grantPermission{value: 0.05 ether}(coordEOA, 0.1 ether, 1 hours);
     }
 
@@ -185,7 +186,7 @@ contract GuildNetTest is Test {
         uint256 permId = permissions.grantPermission{value: 0.1 ether}(coordEOA, 0.1 ether, 1 hours);
 
         vm.prank(coordEOA);
-        vm.expectRevert(GuildPermissions.ExceedsAllowance.selector);
+        vm.expectRevert(ExceedsAllowance.selector);
         permissions.usePermission(permId, payable(research), 0.2 ether);
     }
 }

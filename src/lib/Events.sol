@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-/// @title GuildNet Events
-/// @notice Central event definitions for all GuildNet contracts.
-
 // ── AgentRegistry ─────────────────────────────────────────────────────────────
 event AgentRegistered(address indexed agent, string capability, uint256 price);
 event AgentUpdated(address indexed agent);

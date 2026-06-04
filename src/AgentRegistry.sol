@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-import "./Events.sol";
+import "./lib/Events.sol";
+import "./lib/Errors.sol";
 
 /// @title AgentRegistry — on-chain directory of agents, capabilities, and pricing
 contract AgentRegistry {
-    // ── Errors ────────────────────────────────────────────────────────────────
-    error EmptyCapability();
-    error NotRegistered();
 
     // ── State ─────────────────────────────────────────────────────────────────
     struct Agent {

@@ -2,7 +2,7 @@
 
 import { AgentCard } from "@/components/agents/agent-card";
 import { useAgents } from "@/hooks/use-agents";
-import { Filter, Grid3X3 } from "lucide-react";
+import { Filter } from "lucide-react";
 
 const CATEGORIES = ["All", "Research", "Risk", "Coding", "Design", "Report"];
 

@@ -2,6 +2,14 @@
 
 import { useState, useCallback } from "react";
 
+declare global {
+  interface Window {
+    ethereum?: {
+      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+    };
+  }
+}
+
 interface WalletState {
   connected: boolean;
   address: string;

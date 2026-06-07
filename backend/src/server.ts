@@ -1,12 +1,16 @@
 import "dotenv/config";
 import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { config } from "./config.js";
 import { runCoordinator } from "./coordinator.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Limit /task to 10 requests per minute per IP to protect coordinator budget
+const taskLimiter = rateLimit({ windowMs: 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
@@ -20,7 +24,7 @@ app.get("/health", (_req: Request, res: Response) => {
  * Body: { description: string, budgetEth?: string, durationDays?: number }
  * Runs the full coordinator loop: discover → hire → Venice AI → complete
  */
-app.post("/task", async (req: Request, res: Response, next: NextFunction) => {
+app.post("/task", taskLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { description, budgetEth = "0.05", durationDays = 7 } = req.body as {
       description: string;

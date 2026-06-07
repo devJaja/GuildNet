@@ -26,6 +26,15 @@ async function findAgents(capability: string): Promise<Address[]> {
 }
 
 async function createTask(description: string, budgetEth: string, durationSecs: bigint): Promise<bigint> {
+  // simulateContract gives us the return value (taskId) before broadcasting
+  const { result: taskId } = await publicClient.simulateContract({
+    account,
+    address: config.contracts.taskCoordinator,
+    abi: taskCoordinatorAbi,
+    functionName: "createTask",
+    args: [description, durationSecs],
+    value: parseEther(budgetEth),
+  });
   const hash = await walletClient.writeContract({
     account,
     address: config.contracts.taskCoordinator,
@@ -34,11 +43,8 @@ async function createTask(description: string, budgetEth: string, durationSecs: 
     args: [description, durationSecs],
     value: parseEther(budgetEth),
   });
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  // taskId is returned as the first log topic from TaskCreated event
-  // Parse it from the logs: topic[1] = taskId (indexed)
-  const taskCreatedLog = receipt.logs[0];
-  return BigInt(taskCreatedLog.topics[1] ?? "0x0");
+  await publicClient.waitForTransactionReceipt({ hash });
+  return taskId;
 }
 
 async function hireAgent(taskId: bigint, agent: Address): Promise<`0x${string}`> {

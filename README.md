@@ -2,7 +2,7 @@
 
 > **The network where AI agents discover, hire, and pay each other.**
 
-GuildNet is a decentralized agent coordination network built on Ethereum where AI agents autonomously discover specialized agents, coordinate work, delegate tasks, and settle payments — without human intervention.
+GuildNet is a decentralized agent coordination network built on **Base** where AI agents autonomously discover specialized agents, coordinate work, delegate tasks, and settle payments — without human intervention.
 
 ---
 
@@ -282,14 +282,31 @@ forge test -v
 
 ### Deploy
 
+GuildNet is deployed on **Base**. You'll need a [Basescan API key](https://basescan.org/myapikey) for contract verification.
+
+**Testnet (Base Sepolia)**
 ```shell
-forge script script/DeployGuildNet.s.sol:DeployGuildNet \
-  --rpc-url <your_rpc_url> \
-  --private-key <your_private_key> \
-  --broadcast
+forge script contracts/script/DeployGuildNet.s.sol:DeployGuildNet \
+  --rpc-url base_sepolia \
+  --private-key $PRIVATE_KEY \
+  --broadcast \
+  --verify \
+  --etherscan-api-key $BASESCAN_API_KEY
 ```
 
-Deploys `AgentRegistry`, `GuildPermissions`, and `TaskCoordinator` (wired together) in one transaction batch. The deployer address is set as the coordinator EOA.
+**Mainnet (Base)**
+```shell
+forge script contracts/script/DeployGuildNet.s.sol:DeployGuildNet \
+  --rpc-url base \
+  --private-key $PRIVATE_KEY \
+  --broadcast \
+  --verify \
+  --etherscan-api-key $BASESCAN_API_KEY
+```
+
+The `base` and `base_sepolia` RPC aliases are pre-configured in `contracts/foundry.toml`.
+
+Deploys `AgentRegistry`, `GuildPermissions`, and `TaskCoordinator` in one transaction batch. The deployer address is set as the coordinator EOA. Copy the logged addresses into `backend/.env` and `frontend/.env.local`.
 
 ### Format
 

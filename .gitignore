@@ -1,0 +1,11 @@
+.env
+node_modules/
+dist/
+contracts/out/
+contracts/cache/
+contracts/.env
+backend/dist/
+backend/node_modules/
+frontend/node_modules/
+frontend/.next/
+scripts/

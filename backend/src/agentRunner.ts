@@ -9,13 +9,13 @@
  *   4. Returns its output
  */
 
-import { createWalletClient, createPublicClient, http, parseEther, type Address } from "viem";
+import { createWalletClient, http, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { chain, publicClient } from "./chain";
 import { config, agentRegistryAbi, taskCoordinatorAbi } from "./config";
 import { veniceChat } from "./agents/venice";
 
-export type Capability = "research" | "risk" | "report" | "coding" | "design";
+export type Capability = "research" | "risk" | "report" | "coding" | "design" | "audit";
 
 const SYSTEM_PROMPTS: Record<Capability, string> = {
   research: "You are a market research specialist. Produce concise, factual research: key players, market size, growth trends, and data points.",
@@ -23,6 +23,7 @@ const SYSTEM_PROMPTS: Record<Capability, string> = {
   report:   "You are an expert report writer. Compile a professional report with executive summary, key findings, risk overview, and recommendations.",
   coding:   "You are an expert software engineer. Write clean, well-commented, production-ready code. Include error handling, security considerations, and usage examples.",
   design:   "You are a UI/UX design specialist. Produce detailed design specifications, component breakdowns, user flow descriptions, and accessibility considerations.",
+  audit:    "You are a critical quality auditor. Review AI-generated outputs for accuracy, consistency, and completeness. Flag hallucinations, contradictions, and gaps. Return verdict (PASS/FAIL/NEEDS_REVISION) with specific findings.",
 };
 
 // Sub-agents a capability can hire — only valid when the coordinator hasn't already hired them.

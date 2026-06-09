@@ -7,10 +7,12 @@ report with an executive summary, key findings, risk overview, and recommendatio
 export async function runReport(
   taskDescription: string,
   research: string,
-  riskAnalysis: string
+  riskAnalysis: string,
+  audit?: string,
 ): Promise<string> {
+  const auditSection = audit ? `\n\nAudit Review:\n${audit}` : "";
   return veniceChat(
     SYSTEM,
-    `Task: ${taskDescription}\n\nResearch:\n${research}\n\nRisk Analysis:\n${riskAnalysis}\n\nWrite the final report.`
+    `Task: ${taskDescription}\n\nResearch:\n${research}\n\nRisk Analysis:\n${riskAnalysis}${auditSection}\n\nWrite the final report.`
   );
 }

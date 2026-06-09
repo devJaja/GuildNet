@@ -24,18 +24,22 @@ app.get("/health", (_req: Request, res: Response) => {
  */
 app.post("/task", limiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { description, budgetEth = "0.05", durationDays = 7 } = req.body as {
+    const { description, budgetEth = "0.05", durationDays = 7, capabilities } = req.body as {
       description: string; budgetEth?: string; durationDays?: number;
+      capabilities?: ("research" | "risk" | "coding" | "design" | "audit" | "report")[];
     };
     if (!description?.trim()) { res.status(400).json({ error: "description is required" }); return; }
 
-    const result = await runCoordinator(description, budgetEth, durationDays);
+    const result = await runCoordinator(description, budgetEth, durationDays, capabilities);
     res.json({
       taskId:       result.taskId.toString(),
       agentsHired:  result.agentsHired,
       txHashes:     result.txHashes,
       research:     result.research,
       riskAnalysis: result.riskAnalysis,
+      coding:       result.coding,
+      design:       result.design,
+      audit:        result.audit,
       report:       result.report,
     });
   } catch (err) { next(err); }
@@ -55,7 +59,7 @@ app.post("/agent/:capability/run", limiter, async (req: Request, res: Response, 
       taskId: string; description: string; context?: string;
     };
 
-    if (!["research","risk","report","coding","design"].includes(capability)) {
+    if (!["research","risk","report","coding","design","audit"].includes(capability)) {
       res.status(400).json({ error: `Unknown capability: ${capability}` }); return;
     }
     if (!taskId || !description?.trim()) {

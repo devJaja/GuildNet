@@ -30,12 +30,12 @@ export default function TasksPage() {
           {MOCK_TASKS.map((task) => {
             const { icon: Icon, color, bg, label } = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG];
             return (
-              <div key={task.id} className="glass-card p-5 flex items-center justify-between gap-4">
+              <div key={task.id} className="glass-card p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{task.description}</p>
+                  <p className="text-sm font-medium text-white">{task.description}</p>
                   <p className="text-xs text-zinc-500 mt-1">Task #{task.id} · {task.agents} agents hired · {task.spent} spent</p>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-3 flex-shrink-0 flex-wrap">
                   {task.refund !== "—" && (
                     <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
                       +{task.refund} refunded

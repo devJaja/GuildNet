@@ -1,9 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Bot, ClipboardList, Wallet, Settings, ChevronLeft, ChevronRight, Zap } from "lucide-react";
+import { LayoutDashboard, Bot, ClipboardList, Wallet, Settings, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
@@ -13,16 +14,21 @@ const navItems = [
   { icon: Settings,        label: "Settings",  href: "/settings"  },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
-  return (
-    <aside className={`glass-card border-r border-white/5 flex flex-col transition-all duration-300 ${collapsed ? "w-20" : "w-64"}`}>
+  const navContent = (
+    <>
       {/* Logo */}
       <div className="p-6 flex items-center gap-3 border-b border-white/5">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-violet-600 flex items-center justify-center flex-shrink-0">
-          <Zap className="w-6 h-6 text-white" />
+        <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0">
+          <Image src="/logo.png" alt="GuildNet" width={40} height={40} className="object-cover w-full h-full" />
         </div>
         {!collapsed && (
           <div>
@@ -30,6 +36,10 @@ export function Sidebar() {
             <p className="text-xs text-zinc-500">Agent Network</p>
           </div>
         )}
+        {/* Close button — mobile only */}
+        <button onClick={onClose} className="ml-auto lg:hidden text-zinc-400 hover:text-white">
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Nav */}
@@ -40,6 +50,7 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                 active
                   ? "bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 text-cyan-400"
@@ -54,13 +65,32 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Collapse */}
+      {/* Collapse — desktop only */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="p-4 border-t border-white/5 text-zinc-500 hover:text-white transition-colors flex items-center justify-center"
+        className="hidden lg:flex p-4 border-t border-white/5 text-zinc-500 hover:text-white transition-colors items-center justify-center"
       >
         {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
       </button>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className={`hidden lg:flex glass-card border-r border-white/5 flex-col transition-all duration-300 ${collapsed ? "w-20" : "w-64"}`}>
+        {navContent}
+      </aside>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+          <aside className="absolute left-0 top-0 h-full w-72 glass-card border-r border-white/5 flex flex-col z-10">
+            {navContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

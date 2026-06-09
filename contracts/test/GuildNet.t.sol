@@ -80,9 +80,27 @@ contract GuildNetTest is Test {
     function test_onlyCoordinatorCanHire() public {
         vm.prank(user);
         uint256 taskId = coordinator.createTask{value: 0.05 ether}("task", 1 days);
+        // user is not coordinator and not a registered agent → NotAuthorizedAgent
         vm.prank(user);
-        vm.expectRevert(NotCoordinator.selector);
+        vm.expectRevert(NotAuthorizedAgent.selector);
         coordinator.hireAgent(taskId, research);
+    }
+
+    /// @notice A2A: an active registered agent can hire a sub-agent; payment flows via ERC-7710.
+    function test_agentCanHireSubAgent() public {
+        vm.prank(user);
+        uint256 taskId = coordinator.createTask{value: 0.05 ether}("a2a task", 1 days);
+
+        // research agent hires the risk sub-agent — A2A hiring
+        uint256 before = risk.balance;
+        vm.prank(research);
+        coordinator.hireAgent(taskId, risk);
+        assertEq(risk.balance - before, 0.01 ether, "sub-agent not paid");
+
+        // verify risk is recorded as assigned
+        address[] memory assigned = coordinator.getAssignedAgents(taskId);
+        assertEq(assigned.length, 1);
+        assertEq(assigned[0], risk);
     }
 
     function test_completeTaskRefund() public {

@@ -25,10 +25,11 @@ const SYSTEM_PROMPTS: Record<Capability, string> = {
   design:   "You are a UI/UX design specialist. Produce detailed design specifications, component breakdowns, user flow descriptions, and accessibility considerations.",
 };
 
-// Sub-agents each capability can hire to enrich its output
+// Sub-agents a capability can hire — only valid when the coordinator hasn't already hired them.
+// Keep empty by default; populate only for standalone A2A runs where the coordinator loop
+// is NOT also hiring these sub-agents (to avoid AgentAlreadyPaid reverts).
 const SUB_AGENTS: Partial<Record<Capability, Capability[]>> = {
-  report:  ["research", "risk"],   // report agent hires research + risk
-  coding:  ["research"],           // coding agent hires research for context
+  coding:  ["research"],   // coding agent hires research — coordinator loop never hires research for coding tasks
 };
 
 export interface AgentRunResult {
@@ -51,19 +52,16 @@ async function findAgent(capability: Capability): Promise<Address> {
 }
 
 async function getAgentKey(agentAddress: Address): Promise<`0x${string}`> {
-  // Derive agent key from mnemonic by checking which index matches the address
   const mnemonic = process.env.AGENT_MNEMONIC;
   if (!mnemonic) throw new Error("AGENT_MNEMONIC not set");
+  const { HDKey }           = await import("@scure/bip32");
+  const { mnemonicToSeedSync } = await import("@scure/bip39");
+  const seed  = mnemonicToSeedSync(mnemonic);
+  const hdKey = HDKey.fromMasterSeed(seed);
   for (let i = 0; i < 10; i++) {
-    const { privateKeyToAccount: pkta } = await import("viem/accounts");
-    const { HDKey } = await import("@scure/bip32");
-    const { mnemonicToSeedSync } = await import("@scure/bip39");
-    const seed = mnemonicToSeedSync(mnemonic);
-    const hdKey = HDKey.fromMasterSeed(seed);
     const child = hdKey.derive(`m/44'/60'/0'/0/${i}`);
-    const pk = `0x${Buffer.from(child.privateKey!).toString("hex")}` as `0x${string}`;
-    const acc = pkta(pk);
-    if (acc.address.toLowerCase() === agentAddress.toLowerCase()) return pk;
+    const pk    = `0x${Buffer.from(child.privateKey!).toString("hex")}` as `0x${string}`;
+    if (privateKeyToAccount(pk).address.toLowerCase() === agentAddress.toLowerCase()) return pk;
   }
   throw new Error(`Could not derive key for agent ${agentAddress}`);
 }

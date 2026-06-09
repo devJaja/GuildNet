@@ -7,10 +7,10 @@ import {
   type WalletClient,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { config } from "./config.js";
+import { config } from "./config";
 
 // Define the chain dynamically from env so this works on any EVM network
-const chain = defineChain({
+export const chain = defineChain({
   id: config.chainId,
   name: "GuildNet Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
@@ -25,18 +25,11 @@ export const publicClient: PublicClient = createPublicClient({
   transport: http(config.rpcUrl),
 });
 
-// Wallet client — submits transactions through the 1Shot relay
-// 1Shot accepts standard JSON-RPC requests at its relay endpoint;
-// we point the transport at the 1Shot URL and pass our API key as a header.
+// Wallet client — signs and broadcasts transactions directly.
+// To enable 1Shot gasless relay, replace the transport with:
+//   http(`${config.oneshotBaseUrl}/relay`, { fetchOptions: { headers: { "x-api-key": config.oneshotApiKey } } })
 export const walletClient: WalletClient = createWalletClient({
   account,
   chain,
-  transport: http(`${config.oneshotBaseUrl}/relay`, {
-    fetchOptions: {
-      headers: {
-        "x-api-key": config.oneshotApiKey,
-        "Content-Type": "application/json",
-      },
-    },
-  }),
+  transport: http(config.rpcUrl),
 });

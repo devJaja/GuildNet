@@ -33,6 +33,15 @@ contract TaskCoordinator {
         _;
     }
 
+    /// @dev Allows the coordinator EOA or any active registered agent to hire sub-agents.
+    modifier onlyCoordinatorOrAgent() {
+        if (msg.sender != coordinator) {
+            AgentRegistry.Agent memory caller = registry.agents(msg.sender);
+            if (!caller.active) revert NotAuthorizedAgent();
+        }
+        _;
+    }
+
     // ── Constructor ───────────────────────────────────────────────────────────
     constructor(address _registry, address _permissions, address _coordinator) {
         registry    = AgentRegistry(_registry);
@@ -60,8 +69,9 @@ contract TaskCoordinator {
         return taskId;
     }
 
-    /// @notice Coordinator hires an agent; pays via ERC-7710 usePermission (x402).
-    function hireAgent(uint256 taskId, address agent) external onlyCoordinator {
+    /// @notice Coordinator or any active registered agent hires a sub-agent (A2A hiring).
+    ///         Payment flows via ERC-7710 usePermission (x402).
+    function hireAgent(uint256 taskId, address agent) external onlyCoordinatorOrAgent {
         Task storage t = tasks[taskId];
         if (t.completed)      revert TaskAlreadyCompleted();
         if (t.paid[agent])    revert AgentAlreadyPaid();

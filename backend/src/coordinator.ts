@@ -32,8 +32,8 @@ async function findAgents(capability: string): Promise<Address[]> {
 }
 
 async function createTask(description: string, budgetEth: string, durationSecs: bigint): Promise<bigint> {
-  // simulateContract gives us the return value (taskId) before broadcasting
-  const { result: taskId } = await publicClient.simulateContract({
+  const hash = await walletClient.writeContract({
+    chain,
     account,
     address: config.contracts.taskCoordinator,
     abi: taskCoordinatorAbi,
@@ -41,16 +41,11 @@ async function createTask(description: string, budgetEth: string, durationSecs: 
     args: [description, durationSecs],
     value: parseEther(budgetEth),
   });
-  const hash = await walletClient.writeContract({ chain,
-    account,
-    address: config.contracts.taskCoordinator,
-    abi: taskCoordinatorAbi,
-    functionName: "createTask",
-    args: [description, durationSecs],
-    value: parseEther(budgetEth),
-  });
-  await publicClient.waitForTransactionReceipt({ hash });
-  return taskId;
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  // TaskCreated(uint256 indexed taskId, ...) — taskId is topics[1]
+  const log = receipt.logs.find(l => l.topics.length >= 2);
+  if (!log) throw new Error("TaskCreated log not found");
+  return BigInt(log.topics[1]!);
 }
 
 async function hireAgent(taskId: bigint, agent: Address): Promise<`0x${string}`> {

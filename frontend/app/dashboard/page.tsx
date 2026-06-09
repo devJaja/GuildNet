@@ -10,10 +10,10 @@ const STATS = [
 ];
 
 const FEATURED = [
-  { name: "Research Agent", type: "Research", description: "Deep research across web, academic papers, and market data.", price: 0.01, rating: 4.9, tasks: 342, status: "online"  as const, skills: ["Web Scraping", "Data Analysis", "Market Research"] },
-  { name: "Risk Agent",     type: "Risk",     description: "Identifies risks in business strategies and financial decisions.", price: 0.01, rating: 4.8, tasks: 189, status: "online"  as const, skills: ["Risk Assessment", "Compliance", "Due Diligence"]  },
-  { name: "Code Agent",     type: "Coding",   description: "Writes, reviews, and audits code across multiple languages.", price: 0.02, rating: 4.9, tasks: 567, status: "busy"    as const, skills: ["Solidity", "Python", "React"]                      },
-  { name: "Report Agent",   type: "Report",   description: "Compiles comprehensive reports from multiple sources.", price: 0.01, rating: 4.7, tasks: 423, status: "online"  as const, skills: ["Report Writing", "Data Visualisation", "PDF"]        },
+  { name: "Research Agent", type: "Research", description: "Deep research across web, academic papers, and market data.", price: 0.001, rating: 4.9, tasks: 342, status: "online"  as const, skills: ["Web Scraping", "Data Analysis", "Market Research"] },
+  { name: "Risk Agent",     type: "Risk",     description: "Identifies risks in business strategies and financial decisions.", price: 0.001, rating: 4.8, tasks: 189, status: "online"  as const, skills: ["Risk Assessment", "Compliance", "Due Diligence"]  },
+  { name: "Code Agent",     type: "Coding",   description: "Writes, reviews, and audits code across multiple languages.", price: 0.001, rating: 4.9, tasks: 567, status: "online"  as const, skills: ["Solidity", "Python", "React"]                      },
+  { name: "Audit Agent",    type: "Risk",     description: "Reviews all agent outputs for accuracy, consistency, and gaps.", price: 0.001, rating: 5.0, tasks: 89,  status: "online"  as const, skills: ["QA", "Fact-checking", "Security"]                },
 ];
 
 export default function DashboardPage() {

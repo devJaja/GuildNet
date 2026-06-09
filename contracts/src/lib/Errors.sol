@@ -17,6 +17,7 @@ error AlreadyRevoked();
 error ZeroBudget();
 error NotCoordinator();
 error NotAuthorized();
+error NotAuthorizedAgent();   // caller is neither coordinator nor a registered active agent
 error TaskAlreadyCompleted();
 error AgentAlreadyPaid();
 error AgentInactive();

@@ -1,9 +1,9 @@
 import { parseEther, type Address } from "viem";
-import { publicClient, walletClient, account } from "./chain.js";
-import { config, agentRegistryAbi, taskCoordinatorAbi } from "./config.js";
-import { runResearch } from "./agents/research.js";
-import { runRiskAnalysis } from "./agents/risk.js";
-import { runReport } from "./agents/report.js";
+import { publicClient, walletClient, account, chain } from "./chain";
+import { config, agentRegistryAbi, taskCoordinatorAbi } from "./config";
+import { runResearch } from "./agents/research";
+import { runRiskAnalysis } from "./agents/risk";
+import { runReport } from "./agents/report";
 
 export interface TaskResult {
   taskId: bigint;
@@ -35,7 +35,7 @@ async function createTask(description: string, budgetEth: string, durationSecs: 
     args: [description, durationSecs],
     value: parseEther(budgetEth),
   });
-  const hash = await walletClient.writeContract({
+  const hash = await walletClient.writeContract({ chain,
     account,
     address: config.contracts.taskCoordinator,
     abi: taskCoordinatorAbi,
@@ -48,7 +48,7 @@ async function createTask(description: string, budgetEth: string, durationSecs: 
 }
 
 async function hireAgent(taskId: bigint, agent: Address): Promise<`0x${string}`> {
-  const hash = await walletClient.writeContract({
+  const hash = await walletClient.writeContract({ chain,
     account,
     address: config.contracts.taskCoordinator,
     abi: taskCoordinatorAbi,
@@ -60,7 +60,7 @@ async function hireAgent(taskId: bigint, agent: Address): Promise<`0x${string}`>
 }
 
 async function completeTask(taskId: bigint): Promise<`0x${string}`> {
-  const hash = await walletClient.writeContract({
+  const hash = await walletClient.writeContract({ chain,
     account,
     address: config.contracts.taskCoordinator,
     abi: taskCoordinatorAbi,

@@ -81,14 +81,16 @@ function parseJSON<T>(raw: string): T {
   return JSON.parse(cleaned) as T;
 }
 
+const MODEL = "mistral-small-3-2-24b-instruct";
+
 export async function runArchitect(prompt: string): Promise<BuildPlan> {
-  const raw = await veniceChat(ARCHITECT_SYSTEM, prompt, "mistral-small-3-2-24b-instruct");
+  const raw = await veniceChat(ARCHITECT_SYSTEM, prompt, MODEL);
   return parseJSON<BuildPlan>(raw);
 }
 
 export async function runCoder(prompt: string, plan: BuildPlan): Promise<ProjectFile[]> {
   const userMsg = `Product: ${prompt}\n\nBuild plan:\n${JSON.stringify(plan, null, 2)}\n\nGenerate all files now.`;
-  const raw = await veniceChat(CODER_SYSTEM, userMsg, "mistral-small-3-2-24b-instruct");
+  const raw = await veniceChat(CODER_SYSTEM, userMsg, MODEL);
   return parseJSON<ProjectFile[]>(raw);
 }
 
@@ -96,17 +98,18 @@ export async function runDesigner(prompt: string, files: ProjectFile[]): Promise
   const fileSummary = files.map(f => f.path).join("\n");
   const uiFiles = files.filter(f => /\.(tsx|jsx|css|html)$/.test(f.path));
   const userMsg = `Product: ${prompt}\n\nFiles in project:\n${fileSummary}\n\nUI files to polish:\n${JSON.stringify(uiFiles, null, 2)}`;
-  const raw = await veniceChat(DESIGNER_SYSTEM, userMsg, "mistral-small-3-2-24b-instruct");
+  const raw = await veniceChat(DESIGNER_SYSTEM, userMsg, MODEL);
   const updates = parseJSON<ProjectFile[]>(raw);
-  // Merge updates back into files
   const map = new Map(files.map(f => [f.path, f]));
   for (const u of updates) map.set(u.path, u);
   return Array.from(map.values());
 }
 
 export async function runReviewer(prompt: string, files: ProjectFile[]): Promise<ProjectFile[]> {
-  const userMsg = `Product: ${prompt}\n\nAll files:\n${JSON.stringify(files, null, 2)}`;
-  const raw = await veniceChat(REVIEWER_SYSTEM, userMsg, "mistral-small-3-2-24b-instruct");
+  // Only send source files — skip package.json, tsconfig, etc. to reduce tokens
+  const srcFiles = files.filter(f => /\.(ts|tsx|js|jsx|css)$/.test(f.path));
+  const userMsg = `Product: ${prompt}\n\nSource files:\n${JSON.stringify(srcFiles, null, 2)}`;
+  const raw = await veniceChat(REVIEWER_SYSTEM, userMsg, MODEL);
   const fixes = parseJSON<ProjectFile[]>(raw);
   const map = new Map(files.map(f => [f.path, f]));
   for (const f of fixes) map.set(f.path, f);

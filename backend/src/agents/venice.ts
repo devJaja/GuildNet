@@ -7,7 +7,7 @@ const venice = axios.create({
     Authorization: `Bearer ${config.veniceApiKey}`,
     "Content-Type": "application/json",
   },
-  timeout: 120_000,
+  timeout: 180_000,
 });
 
 export async function veniceChat(

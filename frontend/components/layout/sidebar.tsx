@@ -4,12 +4,13 @@ import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Bot, ClipboardList, Wallet, Settings, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { LayoutDashboard, Bot, ClipboardList, Wallet, Settings, ChevronLeft, ChevronRight, X, Wand2 } from "lucide-react";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Bot,             label: "Agents",    href: "/agents"    },
   { icon: ClipboardList,   label: "Tasks",     href: "/tasks"     },
+  { icon: Wand2,           label: "Builder",   href: "/builder"   },
   { icon: Wallet,          label: "Payments",  href: "/payments"  },
   { icon: Settings,        label: "Settings",  href: "/settings"  },
 ];

@@ -39,11 +39,16 @@ export async function buildProject(prompt: string, baseOutputDir = "/tmp/guildne
   console.log("[Builder] Coding...");
   let files = await runCoder(prompt, plan);
 
-  console.log("[Builder] Designing...");
-  files = await runDesigner(prompt, files);
+  console.log("[Builder] Designing + Reviewing in parallel...");
+  const [designed, reviewed] = await Promise.all([
+    runDesigner(prompt, files),
+    runReviewer(prompt, files),
+  ]);
 
-  console.log("[Builder] Reviewing...");
-  files = await runReviewer(prompt, files);
+  // Merge: reviewer fixes take priority, then designer polish
+  const map = new Map(designed.map(f => [f.path, f]));
+  for (const f of reviewed) map.set(f.path, f);
+  files = Array.from(map.values());
 
   console.log(`[Builder] Writing ${files.length} files to ${outputDir}`);
   writeFiles(outputDir, files);

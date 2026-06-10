@@ -58,7 +58,12 @@ export function TaskCreator({ onTaskComplete }: Props) {
       // ── Step 1: Send createTask via MetaMask extension (window.ethereum) ──
       // Privy is used for auth/identity; the on-chain tx goes through MetaMask
       // directly to avoid Privy relayer timeouts on long-running txs.
-      const ethereum = (window as unknown as { ethereum?: { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+      // Get MetaMask specifically — avoid other extensions hijacking window.ethereum
+      type EthProvider = { request: (a: { method: string; params?: unknown[] }) => Promise<unknown>; isMetaMask?: boolean; providers?: EthProvider[] };
+      const win = window as unknown as { ethereum?: EthProvider };
+      const ethereum: EthProvider | undefined =
+        win.ethereum?.providers?.find(p => p.isMetaMask) ?? // multiple wallets injected
+        (win.ethereum?.isMetaMask ? win.ethereum : undefined); // single MetaMask
       if (!ethereum) throw new Error("MetaMask not found. Please install MetaMask.");
 
       // Switch to Base Sepolia

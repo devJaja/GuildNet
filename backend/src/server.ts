@@ -79,10 +79,42 @@ app.post("/agent/:capability/run", limiter, async (req: Request, res: Response, 
 });
 
 /**
- * POST /build
- * One-prompt builder: architect → code → design → review → write to disk → build
- * Body: { prompt: string }
+ * POST /suggest-agents
+ * Given a task description, returns the optimal capability pipeline.
  */
+app.post("/suggest-agents", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { description } = req.body as { description: string };
+    if (!description?.trim()) { res.status(400).json({ error: "description is required" }); return; }
+
+    const { veniceChat } = await import("./agents/venice.js");
+    const SYSTEM = `You are a task router. Given a task description, return ONLY a JSON array of capability strings needed, in execution order. Available: ["research","risk","coding","design","audit","report"]. Rules: always end with "report" if producing a deliverable. Include "coding" only for software/code tasks. Include "design" only for UI/visual tasks. Include "risk" for business/financial/strategy tasks. Include "audit" for any task requiring quality review. Output example: ["research","risk","audit","report"]`;
+    const raw = await veniceChat(SYSTEM, description, "mistral-small-3-2-24b-instruct");
+    const cleaned = raw.replace(/```[a-z]*\n?/g, "").replace(/```/g, "").trim();
+    const capabilities = JSON.parse(cleaned) as string[];
+    res.json({ capabilities });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /enhance
+ * Refine a specific agent output with a follow-up prompt.
+ */
+app.post("/enhance", limiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { capability, originalOutput, feedback } = req.body as {
+      capability: string; originalOutput: string; feedback: string;
+    };
+    if (!originalOutput?.trim() || !feedback?.trim()) {
+      res.status(400).json({ error: "originalOutput and feedback are required" }); return;
+    }
+    const { veniceChat } = await import("./agents/venice.js");
+    const SYSTEM = `You are a ${capability} specialist. You previously produced an output. The user wants it improved. Apply their feedback precisely and return the complete revised output — no explanations, just the improved content.`;
+    const enhanced = await veniceChat(SYSTEM, `Original output:\n${originalOutput}\n\nUser feedback:\n${feedback}\n\nRevised output:`, "mistral-small-3-2-24b-instruct");
+    res.json({ enhanced });
+  } catch (err) { next(err); }
+});
+
 app.post("/build", limiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { prompt } = req.body as { prompt: string };

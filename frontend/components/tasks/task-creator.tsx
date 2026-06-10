@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { Send, Sparkles, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertCircle, Zap } from "lucide-react";
 import { CAPABILITIES, CONTRACTS, BACKEND_URL } from "@/lib/constants";
+import { encodeFunctionData } from "viem";
 import { useWallet } from "@/hooks/use-wallet";
-import { useWallets } from "@privy-io/react-auth";
-import { createWalletClient, custom, parseEther, encodeFunctionData } from "viem";
 import type { TaskRecord } from "@/hooks/use-tasks";
 
 const PIPELINE_LABELS: Record<string, string> = {
@@ -32,13 +31,6 @@ const CREATE_TASK_ABI = [{
   outputs: [{ name: "", type: "uint256" }],
 }] as const;
 
-const baseSepolia = {
-  id: 84532,
-  name: "Base Sepolia",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: ["https://sepolia.base.org"] } },
-} as const;
-
 interface Props { onTaskComplete?: (task: TaskRecord) => void; }
 
 export function TaskCreator({ onTaskComplete }: Props) {
@@ -51,7 +43,6 @@ export function TaskCreator({ onTaskComplete }: Props) {
   const [onChainTx,     setOnChainTx]     = useState("");
 
   const { connected, address, smartAccount, connect } = useWallet();
-  const { wallets } = useWallets();
 
   const busy = step !== "idle" && step !== "done" && step !== "error";
   const pipelineKeys = ["creating", ...capabilities];
@@ -64,30 +55,32 @@ export function TaskCreator({ onTaskComplete }: Props) {
     setResult(null); setError(""); setOnChainTx(""); setStep("creating");
 
     try {
-      // ── Step 1: MetaMask Smart Account sends createTask on-chain directly ──
-      const wallet = wallets.find(w => w.address === address);
-      if (!wallet) throw new Error("Wallet not found");
+      // ── Step 1: Send createTask via MetaMask extension (window.ethereum) ──
+      // Privy is used for auth/identity; the on-chain tx goes through MetaMask
+      // directly to avoid Privy relayer timeouts on long-running txs.
+      const ethereum = (window as unknown as { ethereum?: { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+      if (!ethereum) throw new Error("MetaMask not found. Please install MetaMask.");
 
-      const provider = await wallet.getEthereumProvider();
-      const walletClient = createWalletClient({
-        account: address as `0x${string}`,
-        chain: baseSepolia,
-        transport: custom(provider),
-      });
+      // Switch to Base Sepolia
+      await ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x14a34" }] })
+        .catch(() => ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [{ chainId: "0x14a34", chainName: "Base Sepolia", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: ["https://sepolia.base.org"], blockExplorerUrls: ["https://sepolia.basescan.org"] }],
+        }));
 
-      const BUDGET = parseEther("0.008");
-      const data   = encodeFunctionData({
+      const accounts = await ethereum.request({ method: "eth_requestAccounts" }) as string[];
+      const from = accounts[0];
+
+      const data = encodeFunctionData({
         abi: CREATE_TASK_ABI,
         functionName: "createTask",
         args: [description, BigInt(7 * 24 * 60 * 60)],
       });
 
-      // Smart Account sends the tx — this is the MetaMask Smart Accounts Kit integration
-      const txHash = await walletClient.sendTransaction({
-        to: CONTRACTS.TASK_COORDINATOR,
-        data,
-        value: BUDGET,
-      });
+      const txHash = await ethereum.request({
+        method: "eth_sendTransaction",
+        params: [{ from, to: CONTRACTS.TASK_COORDINATOR, data, value: "0x1c6bf526340000" /* 0.008 ETH */ }],
+      }) as `0x${string}`;
       setOnChainTx(txHash);
 
       // ── Step 2: Backend coordinator hires agents and runs Venice AI ──

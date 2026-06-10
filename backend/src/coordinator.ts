@@ -89,7 +89,7 @@ export async function runCoordinator(
   result.taskId = await createTask(taskDescription, budgetEth, durationSecs);
   console.log(`[Coordinator] Task created: id=${result.taskId}`);
 
-  // Discover all needed agents up front
+  // Discover all needed agents up front (parallel)
   const agentMap: Partial<Record<string, Address>> = {};
   await Promise.all(capabilities.map(async (cap) => {
     const found = await findAgents(cap);
@@ -97,62 +97,51 @@ export async function runCoordinator(
     agentMap[cap] = found[0];
   }));
 
-  // ── research (parallel with hire tx) ────────────────────────────────────
-  if (capabilities.includes("research")) {
-    console.log(`[Coordinator] Hiring research agent: ${agentMap.research}`);
-    const [tx, output] = await Promise.all([
-      hireAgent(result.taskId, agentMap.research!),
-      runResearch(taskDescription),
-    ]);
-    txHashes.push(tx); agentsHired.push(agentMap.research!);
-    result.research = output;
-    console.log("[Coordinator] Research complete");
+  // ── Wave 1: research + coding + design — Venice runs in parallel, hires are sequential ──
+  // Venice AI calls are parallelized; on-chain hireAgent calls are sequential to avoid nonce collisions.
+  const wave1 = capabilities.filter(c => ["research","coding","design"].includes(c));
+  if (wave1.length > 0) {
+    console.log(`[Coordinator] Wave 1 (Venice parallel, hire sequential): ${wave1.join(", ")}`);
+
+    // Run all Venice AI calls in parallel
+    const veniceResults = await Promise.all(wave1.map(cap =>
+      cap === "research" ? runResearch(taskDescription)
+        : cap === "coding" ? runCoding(taskDescription, taskDescription)
+        : runDesign(taskDescription, "")
+    ));
+
+    // Hire agents sequentially (one nonce at a time)
+    for (let i = 0; i < wave1.length; i++) {
+      const cap = wave1[i];
+      const tx = await hireAgent(result.taskId, agentMap[cap]!);
+      txHashes.push(tx); agentsHired.push(agentMap[cap]!);
+      if (cap === "research") result.research = veniceResults[i];
+      if (cap === "coding")   result.coding   = veniceResults[i];
+      if (cap === "design")   result.design   = veniceResults[i];
+    }
+    console.log("[Coordinator] Wave 1 complete");
   }
 
-  // ── risk ─────────────────────────────────────────────────────────────────
+  // ── Wave 2: risk (uses research context) ─────────────────────────────────
   if (capabilities.includes("risk")) {
-    console.log(`[Coordinator] Hiring risk agent: ${agentMap.risk}`);
+    console.log("[Coordinator] Wave 2: risk");
     const [tx, output] = await Promise.all([
       hireAgent(result.taskId, agentMap.risk!),
       runRiskAnalysis(taskDescription, result.research ?? ""),
     ]);
     txHashes.push(tx); agentsHired.push(agentMap.risk!);
     result.riskAnalysis = output;
-    console.log("[Coordinator] Risk analysis complete");
+    console.log("[Coordinator] Risk complete");
   }
 
-  // ── coding ───────────────────────────────────────────────────────────────
-  if (capabilities.includes("coding")) {
-    console.log(`[Coordinator] Hiring coding agent: ${agentMap.coding}`);
-    const [tx, output] = await Promise.all([
-      hireAgent(result.taskId, agentMap.coding!),
-      runCoding(taskDescription, result.research ?? taskDescription),
-    ]);
-    txHashes.push(tx); agentsHired.push(agentMap.coding!);
-    result.coding = output;
-    console.log("[Coordinator] Coding complete");
-  }
-
-  // ── design ───────────────────────────────────────────────────────────────
-  if (capabilities.includes("design")) {
-    console.log(`[Coordinator] Hiring design agent: ${agentMap.design}`);
-    const [tx, output] = await Promise.all([
-      hireAgent(result.taskId, agentMap.design!),
-      runDesign(taskDescription, result.research ?? ""),
-    ]);
-    txHashes.push(tx); agentsHired.push(agentMap.design!);
-    result.design = output;
-    console.log("[Coordinator] Design complete");
-  }
-
-  // ── audit (runs after all content agents, before report) ─────────────────
+  // ── Wave 3: audit (uses all prior outputs) ────────────────────────────────
   if (capabilities.includes("audit")) {
-    console.log(`[Coordinator] Hiring audit agent: ${agentMap.audit}`);
+    console.log("[Coordinator] Wave 3: audit");
     const outputs: Record<string, string> = {};
-    if (result.research)    outputs.research    = result.research;
-    if (result.riskAnalysis) outputs.risk        = result.riskAnalysis;
-    if (result.coding)      outputs.coding      = result.coding;
-    if (result.design)      outputs.design      = result.design;
+    if (result.research)     outputs.research = result.research;
+    if (result.riskAnalysis) outputs.risk     = result.riskAnalysis;
+    if (result.coding)       outputs.coding   = result.coding;
+    if (result.design)       outputs.design   = result.design;
     const [tx, output] = await Promise.all([
       hireAgent(result.taskId, agentMap.audit!),
       runAudit(taskDescription, outputs),
@@ -162,21 +151,16 @@ export async function runCoordinator(
     console.log("[Coordinator] Audit complete");
   }
 
-  // ── report (always last — aggregates all prior outputs) ──────────────────
+  // ── Wave 4: report (final, uses everything) ───────────────────────────────
   if (capabilities.includes("report")) {
-    console.log(`[Coordinator] Hiring report agent: ${agentMap.report}`);
+    console.log("[Coordinator] Wave 4: report");
     const [tx, output] = await Promise.all([
       hireAgent(result.taskId, agentMap.report!),
-      runReport(
-        taskDescription,
-        result.research ?? "",
-        result.riskAnalysis ?? "",
-        result.audit,
-      ),
+      runReport(taskDescription, result.research ?? "", result.riskAnalysis ?? "", result.audit),
     ]);
     txHashes.push(tx); agentsHired.push(agentMap.report!);
     result.report = output;
-    console.log("[Coordinator] Report compiled");
+    console.log("[Coordinator] Report complete");
   }
 
   const completeTx = await completeTask(result.taskId);

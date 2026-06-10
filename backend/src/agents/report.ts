@@ -18,9 +18,9 @@ export async function runReport(
   audit?: string,
 ): Promise<string> {
   const parts = [`Task: ${taskDescription}`];
-  if (research)     parts.push(`Research:\n${research}`);
-  if (riskAnalysis) parts.push(`Risk Analysis:\n${riskAnalysis}`);
-  if (audit)        parts.push(`Audit Review:\n${audit}`);
+  if (research)     parts.push(`Research:\n${research.slice(0, 1000)}`);
+  if (riskAnalysis) parts.push(`Risk:\n${riskAnalysis.slice(0, 800)}`);
+  if (audit)        parts.push(`Audit:\n${audit.slice(0, 500)}`);
   parts.push("Produce the final deliverable now:");
   return veniceChat(SYSTEM, parts.join("\n\n"), "mistral-small-3-2-24b-instruct");
 }

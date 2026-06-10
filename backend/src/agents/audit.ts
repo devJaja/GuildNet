@@ -1,14 +1,11 @@
 import { veniceChat } from "./venice.js";
 
-const SYSTEM = `You are a critical quality auditor for AI-generated outputs. 
-Review the provided agent outputs for accuracy, consistency, completeness, and logical soundness. 
-Flag hallucinations, contradictions, gaps, or unsupported claims. 
-Provide a structured audit report: overall verdict (PASS/FAIL/NEEDS_REVISION), 
-per-section findings, and specific corrections where needed.`;
+const SYSTEM = `You are a quality auditor. Review the provided outputs for accuracy and completeness. Give a verdict (PASS/FAIL/NEEDS_REVISION) and list key findings. Be concise.`;
 
 export async function runAudit(taskDescription: string, outputs: Record<string, string>): Promise<string> {
+  // Truncate each section to avoid token overflow
   const sections = Object.entries(outputs)
-    .map(([k, v]) => `[${k.toUpperCase()}]\n${v}`)
+    .map(([k, v]) => `[${k.toUpperCase()}]\n${v.slice(0, 600)}`)
     .join("\n\n");
-  return veniceChat(SYSTEM, `Task: ${taskDescription}\n\nOutputs to audit:\n\n${sections}`);
+  return veniceChat(SYSTEM, `Task: ${taskDescription}\n\n${sections}`, "mistral-small-3-2-24b-instruct");
 }

@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import { config } from "./config";
 import { runCoordinator } from "./coordinator";
 import { runAgent, type Capability } from "./agentRunner";
+import { buildProject } from "./builder";
 
 const app = express();
 app.use(cors());
@@ -73,6 +74,26 @@ app.post("/agent/:capability/run", limiter, async (req: Request, res: Response, 
       output:         result.output,
       subAgentsHired: result.subAgentsHired,
       txHashes:       result.txHashes,
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * POST /build
+ * One-prompt builder: architect → code → design → review → write to disk → build
+ * Body: { prompt: string }
+ */
+app.post("/build", limiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { prompt } = req.body as { prompt: string };
+    if (!prompt?.trim()) { res.status(400).json({ error: "prompt is required" }); return; }
+    const result = await buildProject(prompt);
+    res.json({
+      success:   result.success,
+      outputDir: result.outputDir,
+      plan:      result.plan,
+      files:     result.files.map(f => ({ path: f.path, size: f.content.length })),
+      buildLog:  result.buildLog.slice(-2000), // last 2000 chars
     });
   } catch (err) { next(err); }
 });

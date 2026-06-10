@@ -8,39 +8,26 @@ export function WalletConnect() {
 
   if (!connected) {
     return (
-      <button
-        onClick={connect}
-        disabled={connecting}
-        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-violet-600 rounded-lg font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-60 glow-hover"
-      >
-        <Wallet className="w-4 h-4" />
-        {connecting ? "Connecting..." : "Connect Wallet"}
+      <button onClick={connect} disabled={connecting}
+        className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
+        <Wallet className="w-3.5 h-3.5" />
+        {connecting ? "Connecting…" : "Connect"}
       </button>
     );
   }
 
-  const short = `${address.slice(0, 6)}...${address.slice(-4)}`;
-
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg">
-        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        {smartAccount && (
-          <span className="flex items-center gap-1 text-xs text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
-            <Zap className="w-3 h-3" />SA
-          </span>
-        )}
-        <span className="text-sm font-medium text-zinc-300">{short}</span>
-        <button onClick={copyAddress} className="text-zinc-500 hover:text-white transition-colors">
-          {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-        </button>
-      </div>
-      <a
-        href={`https://sepolia.basescan.org/address/${address}`}
-        target="_blank" rel="noopener noreferrer"
-        className="p-2 text-zinc-400 hover:text-white transition-colors"
-      >
-        <ExternalLink className="w-4 h-4" />
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-white/[0.04]">
+      {smartAccount
+        ? <Zap className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+        : <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse flex-shrink-0" />}
+      <span className="text-sm font-medium text-slate-200">{address.slice(0,6)}…{address.slice(-4)}</span>
+      <button onClick={copyAddress} className="text-slate-500 hover:text-white transition-colors">
+        {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+      </button>
+      <a href={`https://sepolia.basescan.org/address/${address}`} target="_blank" rel="noreferrer"
+        className="text-slate-500 hover:text-cyan-400 transition-colors">
+        <ExternalLink className="w-3.5 h-3.5" />
       </a>
     </div>
   );

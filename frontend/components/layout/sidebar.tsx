@@ -1,95 +1,82 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Bot, ClipboardList, Wallet, Settings, ChevronLeft, ChevronRight, X, Wand2, PlusCircle } from "lucide-react";
+import { useState } from "react";
+import { LayoutDashboard, Bot, ClipboardList, Wallet, Settings, Wand2, PlusCircle, ChevronLeft, ChevronRight, X } from "lucide-react";
 
-const navItems = [
+const NAV = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: Bot,             label: "Agents",    href: "/agents"    },
   { icon: ClipboardList,   label: "Tasks",     href: "/tasks"     },
+  { icon: Bot,             label: "Agents",    href: "/agents"    },
   { icon: Wand2,           label: "Builder",   href: "/builder"   },
   { icon: PlusCircle,      label: "Register",  href: "/register"  },
   { icon: Wallet,          label: "Payments",  href: "/payments"  },
   { icon: Settings,        label: "Settings",  href: "/settings"  },
 ];
 
-interface SidebarProps {
-  mobileOpen: boolean;
-  onClose: () => void;
-}
+interface Props { mobileOpen: boolean; onClose: () => void; }
 
-export function Sidebar({ mobileOpen, onClose }: SidebarProps) {
+export function Sidebar({ mobileOpen, onClose }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
-  const navContent = (
-    <>
-      {/* Logo */}
-      <div className="p-6 flex items-center gap-3 border-b border-white/5">
-        <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0">
-          <Image src="/logo.png" alt="GuildNet" width={40} height={40} className="object-cover w-full h-full" />
+  const content = (
+    <div className="flex flex-col h-full">
+      <div className={`flex items-center gap-3 p-4 border-b border-white/[0.06] ${collapsed ? "justify-center" : ""}`}>
+        <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-white/10">
+          <Image src="/logo.png" alt="GuildNet" width={36} height={36} className="object-cover w-full h-full" />
         </div>
         {!collapsed && (
-          <div>
-            <h1 className="font-bold text-xl gradient-text">GuildNet</h1>
-            <p className="text-xs text-zinc-500">Agent Network</p>
+          <div className="min-w-0">
+            <p className="font-bold text-base gradient-text leading-none">GuildNet</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Agent Network</p>
           </div>
         )}
-        {/* Close button — mobile only */}
-        <button onClick={onClose} className="ml-auto lg:hidden text-zinc-400 hover:text-white">
-          <X className="w-5 h-5" />
+        <button onClick={onClose} className="ml-auto lg:hidden text-slate-500 hover:text-white p-1 rounded-lg hover:bg-white/5">
+          <X className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 p-4 space-y-2">
-        {navItems.map(({ icon: Icon, label, href }) => {
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+        {NAV.map(({ icon: Icon, label, href }) => {
           const active = pathname === href;
           return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onClose}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+            <Link key={href} href={href} onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group ${
                 active
-                  ? "bg-gradient-to-r from-cyan-500/20 to-violet-500/20 border border-cyan-500/30 text-cyan-400"
-                  : "text-zinc-400 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              <Icon className={`w-5 h-5 flex-shrink-0 ${active ? "text-cyan-400" : "group-hover:text-cyan-400"}`} />
-              {!collapsed && <span className="font-medium">{label}</span>}
+                  ? "bg-gradient-to-r from-cyan-500/15 to-violet-500/10 text-cyan-400 border border-cyan-500/20"
+                  : "text-slate-400 hover:text-white hover:bg-white/[0.06]"
+              }`}>
+              <Icon style={{ width: 17, height: 17 }} className={`flex-shrink-0 ${active ? "text-cyan-400" : "group-hover:text-cyan-400 transition-colors"}`} />
+              {!collapsed && <span className="text-sm font-medium">{label}</span>}
               {active && !collapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />}
             </Link>
           );
         })}
       </nav>
 
-      {/* Collapse — desktop only */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="hidden lg:flex p-4 border-t border-white/5 text-zinc-500 hover:text-white transition-colors items-center justify-center"
-      >
-        {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+      <button onClick={() => setCollapsed(!collapsed)}
+        className="hidden lg:flex items-center justify-center p-3.5 border-t border-white/[0.06] text-slate-600 hover:text-white transition-colors">
+        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
       </button>
-    </>
+    </div>
   );
 
   return (
     <>
-      {/* Desktop sidebar */}
-      <aside className={`hidden lg:flex glass-card border-r border-white/5 flex-col transition-all duration-300 ${collapsed ? "w-20" : "w-64"}`}>
-        {navContent}
+      <aside className={`hidden lg:flex flex-col border-r border-white/[0.06] transition-all duration-300 ${collapsed ? "w-[60px]" : "w-56"}`}
+        style={{ background: "rgba(7,7,15,0.95)" }}>
+        {content}
       </aside>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-          <aside className="absolute left-0 top-0 h-full w-72 glass-card border-r border-white/5 flex flex-col z-10">
-            {navContent}
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+          <aside className="absolute left-0 top-0 h-full w-56 border-r border-white/[0.06] flex flex-col"
+            style={{ background: "rgba(7,7,15,0.98)" }}>
+            {content}
           </aside>
         </div>
       )}

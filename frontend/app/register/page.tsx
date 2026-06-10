@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, ExternalLink, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Bot, ExternalLink, CheckCircle, AlertCircle, Loader2, ShieldCheck, ShieldX } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useWallets } from "@privy-io/react-auth";
 import { createWalletClient, custom, encodeFunctionData, parseEther } from "viem";
-import { CONTRACTS, CAPABILITIES } from "@/lib/constants";
+import { CONTRACTS, CAPABILITIES, BACKEND_URL } from "@/lib/constants";
 
 const REGISTER_ABI = [{
   name: "register", type: "function", stateMutability: "nonpayable",
@@ -38,9 +38,24 @@ export default function RegisterPage() {
   const [loading,     setLoading]     = useState(false);
   const [txHash,      setTxHash]      = useState("");
   const [error,       setError]       = useState("");
+  const [verifying,   setVerifying]   = useState(false);
+  const [verified,    setVerified]    = useState<{ ok: boolean; reason?: string } | null>(null);
 
   const { connected, address, connect } = useWallet();
   const { wallets } = useWallets();
+
+  async function verifyEndpoint() {
+    if (!endpoint.trim()) return;
+    setVerifying(true); setVerified(null);
+    try {
+      const res = await fetch(`${BACKEND_URL}/verify-endpoint`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint }),
+      });
+      setVerified(await res.json());
+    } catch { setVerified({ ok: false, reason: "Could not reach verification service" }); }
+    finally { setVerifying(false); }
+  }
 
   async function handleSubmit() {
     if (!endpoint.trim() || !price || !connected) return;
@@ -112,9 +127,22 @@ export default function RegisterPage() {
         {/* Endpoint */}
         <div>
           <label className="text-xs text-zinc-500 mb-1.5 block">Agent Endpoint URL</label>
-          <input value={endpoint} onChange={e => setEndpoint(e.target.value)}
-            placeholder="https://your-agent.com/api or Venice AI URL"
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50" />
+          <div className="flex gap-2">
+            <input value={endpoint} onChange={e => { setEndpoint(e.target.value); setVerified(null); }}
+              placeholder="https://your-agent.com/api"
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50" />
+            <button onClick={verifyEndpoint} disabled={!endpoint.trim() || verifying}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-zinc-400 hover:text-white hover:border-white/20 transition-all disabled:opacity-40 flex-shrink-0">
+              {verifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+              Verify
+            </button>
+          </div>
+          {verified && (
+            <div className={`flex items-center gap-2 mt-2 text-xs ${verified.ok ? "text-green-400" : "text-red-400"}`}>
+              {verified.ok ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldX className="w-3.5 h-3.5" />}
+              {verified.ok ? "Endpoint reachable and responding" : verified.reason}
+            </div>
+          )}
           <p className="text-xs text-zinc-600 mt-1">Venice AI endpoint, custom API, or any HTTP endpoint that accepts POST with a task description.</p>
         </div>
 

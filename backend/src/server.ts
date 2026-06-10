@@ -79,6 +79,46 @@ app.post("/agent/:capability/run", limiter, async (req: Request, res: Response, 
 });
 
 /**
+ * POST /verify-endpoint
+ * Probes an agent endpoint to confirm it's reachable and returns a valid response.
+ */
+app.post("/verify-endpoint", limiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { endpoint } = req.body as { endpoint: string };
+    if (!endpoint?.trim()) { res.status(400).json({ error: "endpoint is required" }); return; }
+
+    // Must be a valid URL
+    let url: URL;
+    try { url = new URL(endpoint); } catch { res.status(400).json({ ok: false, reason: "Invalid URL" }); return; }
+    if (!["http:", "https:"].includes(url.protocol)) {
+      res.status(400).json({ ok: false, reason: "URL must be http or https" }); return;
+    }
+
+    // Probe with a minimal test task
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const probe = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "ping", description: "GuildNet endpoint verification" }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!probe.ok) {
+        res.json({ ok: false, reason: `Endpoint returned HTTP ${probe.status}` }); return;
+      }
+      const text = await probe.text().catch(() => "");
+      res.json({ ok: true, status: probe.status, preview: text.slice(0, 200) });
+    } catch (e: unknown) {
+      clearTimeout(timeout);
+      const msg = (e as Error).message ?? "Connection failed";
+      res.json({ ok: false, reason: msg.includes("abort") ? "Endpoint timed out (>10s)" : msg });
+    }
+  } catch (err) { next(err); }
+});
+
+/**
  * POST /suggest-agents
  * Given a task description, returns the optimal capability pipeline.
  */

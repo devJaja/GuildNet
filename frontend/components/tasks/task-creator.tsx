@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Send, Sparkles, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertCircle, Zap } from "lucide-react";
 import { CAPABILITIES, CONTRACTS, BACKEND_URL } from "@/lib/constants";
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, createWalletClient, custom } from "viem";
 import { useWallet } from "@/hooks/use-wallet";
+import { useWallets } from "@privy-io/react-auth";
 import type { TaskRecord } from "@/hooks/use-tasks";
 
 const PIPELINE_LABELS: Record<string, string> = {
@@ -43,6 +44,7 @@ export function TaskCreator({ onTaskComplete }: Props) {
   const [onChainTx,     setOnChainTx]     = useState("");
 
   const { connected, address, smartAccount, connect } = useWallet();
+  const { wallets } = useWallets();
 
   const busy = step !== "idle" && step !== "done" && step !== "error";
   const pipelineKeys = ["creating", ...capabilities];
@@ -58,34 +60,27 @@ export function TaskCreator({ onTaskComplete }: Props) {
       // ── Step 1: Send createTask via MetaMask extension (window.ethereum) ──
       // Privy is used for auth/identity; the on-chain tx goes through MetaMask
       // directly to avoid Privy relayer timeouts on long-running txs.
-      // Get MetaMask specifically — avoid other extensions hijacking window.ethereum
-      type EthProvider = { request: (a: { method: string; params?: unknown[] }) => Promise<unknown>; isMetaMask?: boolean; providers?: EthProvider[] };
-      const win = window as unknown as { ethereum?: EthProvider };
-      const ethereum: EthProvider | undefined =
-        win.ethereum?.providers?.find(p => p.isMetaMask) ?? // multiple wallets injected
-        (win.ethereum?.isMetaMask ? win.ethereum : undefined); // single MetaMask
-      if (!ethereum) throw new Error("MetaMask not found. Please install MetaMask.");
+      // ── Step 1: Sign createTask via Privy wallet (MetaMask or embedded) ──
+      const wallet = wallets.find(w => w.address.toLowerCase() === address.toLowerCase())
+        ?? wallets[0];
+      if (!wallet) throw new Error("No wallet found. Please reconnect.");
 
       // Switch to Base Sepolia
-      await ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x14a34" }] })
-        .catch(() => ethereum.request({
-          method: "wallet_addEthereumChain",
-          params: [{ chainId: "0x14a34", chainName: "Base Sepolia", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: ["https://sepolia.base.org"], blockExplorerUrls: ["https://sepolia.basescan.org"] }],
-        }));
+      await wallet.switchChain(84532);
 
-      const accounts = await ethereum.request({ method: "eth_requestAccounts" }) as string[];
-      const from = accounts[0];
-
-      const data = encodeFunctionData({
-        abi: CREATE_TASK_ABI,
-        functionName: "createTask",
-        args: [description, BigInt(7 * 24 * 60 * 60)],
+      // getEthereumProvider returns MetaMask's provider when user connected with MetaMask
+      const provider = await wallet.getEthereumProvider();
+      const viemWallet = createWalletClient({
+        account: address as `0x${string}`,
+        transport: custom(provider),
       });
 
-      const txHash = await ethereum.request({
-        method: "eth_sendTransaction",
-        params: [{ from, to: CONTRACTS.TASK_COORDINATOR, data, value: "0x1c6bf526340000" /* 0.008 ETH */ }],
-      }) as `0x${string}`;
+      const txHash = await viemWallet.sendTransaction({
+        chain: { id: 84532, name: "Base Sepolia", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: ["https://sepolia.base.org"] } } },
+        to:    CONTRACTS.TASK_COORDINATOR,
+        data:  encodeFunctionData({ abi: CREATE_TASK_ABI, functionName: "createTask", args: [description, BigInt(7 * 24 * 60 * 60)] }),
+        value: BigInt("8000000000000000"), // 0.008 ETH
+      });
       setOnChainTx(txHash);
 
       // ── Step 2: Backend coordinator hires agents and runs Venice AI ──

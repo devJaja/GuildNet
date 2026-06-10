@@ -1,67 +1,41 @@
 "use client";
 
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useState, useCallback } from "react";
-import { CHAIN_ID } from "@/lib/constants";
-
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-    };
-  }
-}
 
 interface WalletState {
   connected: boolean;
   address: string;
   connecting: boolean;
   copied: boolean;
+  smartAccount: boolean;
   connect: () => Promise<void>;
   disconnect: () => void;
   copyAddress: () => void;
 }
 
-const CHAIN_HEX = `0x${CHAIN_ID.toString(16)}`;
-
 export function useWallet(): WalletState {
-  const [connected,  setConnected]  = useState(false);
-  const [address,    setAddress]    = useState("");
-  const [connecting, setConnecting] = useState(false);
-  const [copied,     setCopied]     = useState(false);
+  const { ready, authenticated, login, logout, user } = usePrivy();
+  const { wallets } = useWallets();
+  const [copied, setCopied] = useState(false);
+
+  // Prefer smart wallet, fall back to embedded, then external
+  const activeWallet =
+    wallets.find(w => w.walletClientType === "privy" && w.connectorType === "embedded") ??
+    wallets.find(w => w.walletClientType === "metamask") ??
+    wallets[0];
+
+  const address = activeWallet?.address ?? "";
+  const connected = authenticated && !!address;
+  const connecting = !ready;
+  // Privy embedded wallets are smart accounts when smartWallets.enabled = true
+  const smartAccount = activeWallet?.walletClientType === "privy";
 
   const connect = useCallback(async () => {
-    if (typeof window === "undefined" || !window.ethereum) {
-      alert("MetaMask not detected. Please install MetaMask.");
-      return;
-    }
-    setConnecting(true);
-    try {
-      // Switch / add Base Sepolia
-      try {
-        await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] });
-      } catch {
-        await window.ethereum.request({
-          method: "wallet_addEthereumChain",
-          params: [{
-            chainId: CHAIN_HEX,
-            chainName: "Base Sepolia",
-            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-            rpcUrls: ["https://sepolia.base.org"],
-            blockExplorerUrls: ["https://sepolia.basescan.org"],
-          }],
-        });
-      }
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" }) as string[];
-      setAddress(accounts[0]);
-      setConnected(true);
-    } catch {
-      // user rejected
-    } finally {
-      setConnecting(false);
-    }
-  }, []);
+    if (!authenticated) login();
+  }, [authenticated, login]);
 
-  const disconnect = useCallback(() => { setConnected(false); setAddress(""); }, []);
+  const disconnect = useCallback(() => { logout(); }, [logout]);
 
   const copyAddress = useCallback(() => {
     if (!address) return;
@@ -70,5 +44,5 @@ export function useWallet(): WalletState {
     setTimeout(() => setCopied(false), 2000);
   }, [address]);
 
-  return { connected, address, connecting, copied, connect, disconnect, copyAddress };
+  return { connected, address, connecting, copied, smartAccount, connect, disconnect, copyAddress };
 }

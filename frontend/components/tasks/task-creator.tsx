@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Send, Sparkles, Loader2, CheckCircle, ChevronDown, ChevronUp, AlertCircle, Zap } from "lucide-react";
-import { CAPABILITIES, CONTRACTS } from "@/lib/constants";
+import { CAPABILITIES, CONTRACTS, BACKEND_URL } from "@/lib/constants";
 import { useWallet } from "@/hooks/use-wallet";
 import { useWallets } from "@privy-io/react-auth";
 import { createWalletClient, custom, parseEther, encodeFunctionData } from "viem";
@@ -97,10 +97,11 @@ export function TaskCreator({ onTaskComplete }: Props) {
         setStep(pipelineKeys[si]);
       }, 14_000);
 
-      const res = await fetch("/api/task", {
+      const res = await fetch(`${BACKEND_URL}/task`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description, budgetEth: "0.008", capabilities }),
+        signal: AbortSignal.timeout(300_000), // 5 min
       });
       clearInterval(ticker);
 

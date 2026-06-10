@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { CHAIN_ID } from "@/lib/constants";
 
 declare global {
   interface Window {
@@ -20,6 +21,8 @@ interface WalletState {
   copyAddress: () => void;
 }
 
+const CHAIN_HEX = `0x${CHAIN_ID.toString(16)}`;
+
 export function useWallet(): WalletState {
   const [connected,  setConnected]  = useState(false);
   const [address,    setAddress]    = useState("");
@@ -33,6 +36,21 @@ export function useWallet(): WalletState {
     }
     setConnecting(true);
     try {
+      // Switch / add Base Sepolia
+      try {
+        await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_HEX }] });
+      } catch {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: CHAIN_HEX,
+            chainName: "Base Sepolia",
+            nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+            rpcUrls: ["https://sepolia.base.org"],
+            blockExplorerUrls: ["https://sepolia.basescan.org"],
+          }],
+        });
+      }
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" }) as string[];
       setAddress(accounts[0]);
       setConnected(true);
@@ -43,10 +61,7 @@ export function useWallet(): WalletState {
     }
   }, []);
 
-  const disconnect = useCallback(() => {
-    setConnected(false);
-    setAddress("");
-  }, []);
+  const disconnect = useCallback(() => { setConnected(false); setAddress(""); }, []);
 
   const copyAddress = useCallback(() => {
     if (!address) return;

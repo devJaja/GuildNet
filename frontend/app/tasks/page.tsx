@@ -1,56 +1,53 @@
+"use client";
+
+import { useState } from "react";
 import { TaskCreator } from "@/components/tasks/task-creator";
-import { CheckCircle, Clock, Loader2 } from "lucide-react";
-
-const MOCK_TASKS = [
-  { id: "0", description: "Market entry report for EV charging in Southeast Asia", status: "completed", agents: 3, spent: "0.03 ETH", refund: "0.02 ETH" },
-  { id: "1", description: "Smart contract security audit for DeFi protocol",        status: "running",   agents: 2, spent: "0.02 ETH", refund: "—"        },
-  { id: "2", description: "UI/UX design system for mobile Web3 wallet",              status: "pending",   agents: 0, spent: "0 ETH",   refund: "—"        },
-];
-
-const STATUS_CONFIG = {
-  completed: { icon: CheckCircle, color: "text-green-400",  bg: "bg-green-500/10",  label: "Completed" },
-  running:   { icon: Loader2,     color: "text-cyan-400",   bg: "bg-cyan-500/10",   label: "Running"   },
-  pending:   { icon: Clock,       color: "text-amber-400",  bg: "bg-amber-500/10",  label: "Pending"   },
-};
+import { CheckCircle, ExternalLink } from "lucide-react";
+import type { TaskRecord } from "@/hooks/use-tasks";
 
 export default function TasksPage() {
+  const [completed, setCompleted] = useState<TaskRecord[]>([]);
+
   return (
     <div className="space-y-8 animate-slide-up">
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Tasks</h1>
-        <p className="text-zinc-400">Submit tasks and track their execution across agents</p>
+        <p className="text-zinc-400">Submit tasks — agents autonomously discover, hire, and pay each other</p>
       </div>
 
-      <TaskCreator />
+      <TaskCreator onTaskComplete={t => setCompleted(prev => [t, ...prev])} />
 
-      {/* Task history */}
-      <div>
-        <h2 className="text-xl font-bold text-white mb-4">Task History</h2>
-        <div className="space-y-3">
-          {MOCK_TASKS.map((task) => {
-            const { icon: Icon, color, bg, label } = STATUS_CONFIG[task.status as keyof typeof STATUS_CONFIG];
-            return (
-              <div key={task.id} className="glass-card p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {completed.length > 0 && (
+        <div>
+          <h2 className="text-xl font-bold text-white mb-4">Completed This Session</h2>
+          <div className="space-y-3">
+            {completed.map(task => (
+              <div key={task.taskId} className="glass-card p-4 md:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white">{task.description}</p>
-                  <p className="text-xs text-zinc-500 mt-1">Task #{task.id} · {task.agents} agents hired · {task.spent} spent</p>
+                  <p className="text-sm font-medium text-white truncate">{task.description}</p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Task #{task.taskId} · {task.agentsHired.length} agents hired · {task.txHashes.length} on-chain txs
+                  </p>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0 flex-wrap">
-                  {task.refund !== "—" && (
-                    <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded-full">
-                      +{task.refund} refunded
-                    </span>
-                  )}
-                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${bg}`}>
-                    <Icon className={`w-3.5 h-3.5 ${color} ${task.status === "running" ? "animate-spin" : ""}`} />
-                    <span className={`text-xs font-medium ${color}`}>{label}</span>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <a
+                    href={`https://sepolia.basescan.org/tx/${task.txHashes[0]}`}
+                    target="_blank" rel="noreferrer"
+                    className="p-2 text-zinc-400 hover:text-cyan-400 transition-colors"
+                    title="View on Basescan"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30">
+                    <CheckCircle className="w-3.5 h-3.5 text-green-400" />
+                    <span className="text-xs font-medium text-green-400">Completed</span>
                   </div>
                 </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

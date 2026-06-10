@@ -126,7 +126,7 @@ export async function runCoordinator(
     console.log(`[Coordinator] Hiring coding agent: ${agentMap.coding}`);
     const [tx, output] = await Promise.all([
       hireAgent(result.taskId, agentMap.coding!),
-      runCoding(taskDescription, result.research ?? ""),
+      runCoding(taskDescription, result.research ?? taskDescription),
     ]);
     txHashes.push(tx); agentsHired.push(agentMap.coding!);
     result.coding = output;

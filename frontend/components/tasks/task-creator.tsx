@@ -64,7 +64,8 @@ export function TaskCreator({ onTaskComplete }: Props) {
     if (!description.trim() || busy) return;
     if (!connected) { connect(); return; }
 
-    // Auto-suggest agents if in auto mode
+    // Auto-suggest agents and capture the result directly (don't rely on state update)
+    let activeCaps = capabilities;
     if (autoMode) {
       setSuggesting(true);
       try {
@@ -73,11 +74,15 @@ export function TaskCreator({ onTaskComplete }: Props) {
           body: JSON.stringify({ description }),
         });
         const data = await res.json();
-        if (data.capabilities) setCapabilities(data.capabilities);
+        if (data.capabilities?.length) {
+          activeCaps = data.capabilities;
+          setCapabilities(activeCaps);
+        }
       } catch {} finally { setSuggesting(false); }
     }
 
     setResult(null); setError(""); setOnChainTx(""); setEnhanced({}); setStep("creating");
+    const pKeys = ["creating", ...activeCaps];
 
     try {
       // ── Send createTask via Privy wallet ──
@@ -94,12 +99,12 @@ export function TaskCreator({ onTaskComplete }: Props) {
       });
       setOnChainTx(txHash);
 
-      // ── Run backend pipeline ──
+      // ── Run backend pipeline with the resolved capabilities ──
       let si = 1;
-      const ticker = setInterval(() => { si = Math.min(si + 1, pipelineKeys.length - 1); setStep(pipelineKeys[si]); }, 14_000);
+      const ticker = setInterval(() => { si = Math.min(si + 1, pKeys.length - 1); setStep(pKeys[si]); }, 14_000);
       const res = await fetch(`${BACKEND_URL}/task`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, budgetEth: "0.008", capabilities }),
+        body: JSON.stringify({ description, budgetEth: "0.008", capabilities: activeCaps }),
         signal: AbortSignal.timeout(300_000),
       });
       clearInterval(ticker);

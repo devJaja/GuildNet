@@ -82,7 +82,7 @@ app.post("/agent/:capability/run", limiter, async (req: Request, res: Response, 
  * POST /suggest-agents
  * Given a task description, returns the optimal capability pipeline.
  */
-app.post("/suggest-agents", async (req: Request, res: Response, next: NextFunction) => {
+app.post("/suggest-agents", limiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { description } = req.body as { description: string };
     if (!description?.trim()) { res.status(400).json({ error: "description is required" }); return; }

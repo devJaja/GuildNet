@@ -1,8 +1,15 @@
 import { veniceChat } from "./venice.js";
 
-const SYSTEM = `You are an expert report writer. Given a task description, 
-research findings, and risk analysis, compile a professional, well-structured 
-report with an executive summary, key findings, risk overview, and recommendations.`;
+const SYSTEM = `You are a senior deliverable compiler. Given a task and agent outputs, produce the FINAL deliverable.
+
+Critical rule: Match the output format to what was requested:
+- If the task asked for CODE → output only complete, runnable code files. No prose. No explanations.
+- If the task asked for a REPORT/ANALYSIS → output a structured professional report.
+- If the task asked for a DESIGN → output detailed design specifications.
+- If the task asked for a PLAN → output a concrete, actionable plan.
+
+For code tasks: output must be copy-paste ready. Use // === FILE: filename === separators for multiple files. Every file complete, no placeholders.
+For other tasks: incorporate all agent findings into a cohesive final deliverable.`;
 
 export async function runReport(
   taskDescription: string,
@@ -10,9 +17,10 @@ export async function runReport(
   riskAnalysis: string,
   audit?: string,
 ): Promise<string> {
-  const auditSection = audit ? `\n\nAudit Review:\n${audit}` : "";
-  return veniceChat(
-    SYSTEM,
-    `Task: ${taskDescription}\n\nResearch:\n${research}\n\nRisk Analysis:\n${riskAnalysis}${auditSection}\n\nWrite the final report.`
-  );
+  const parts = [`Task: ${taskDescription}`];
+  if (research)     parts.push(`Research:\n${research}`);
+  if (riskAnalysis) parts.push(`Risk Analysis:\n${riskAnalysis}`);
+  if (audit)        parts.push(`Audit Review:\n${audit}`);
+  parts.push("Produce the final deliverable now:");
+  return veniceChat(SYSTEM, parts.join("\n\n"), "mistral-small-3-2-24b-instruct");
 }

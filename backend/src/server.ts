@@ -88,7 +88,23 @@ app.post("/suggest-agents", async (req: Request, res: Response, next: NextFuncti
     if (!description?.trim()) { res.status(400).json({ error: "description is required" }); return; }
 
     const { veniceChat } = await import("./agents/venice.js");
-    const SYSTEM = `You are a task router. Given a task description, return ONLY a JSON array of capability strings needed, in execution order. Available: ["research","risk","coding","design","audit","report"]. Rules: always end with "report" if producing a deliverable. Include "coding" only for software/code tasks. Include "design" only for UI/visual tasks. Include "risk" for business/financial/strategy tasks. Include "audit" for any task requiring quality review. Output example: ["research","risk","audit","report"]`;
+    const SYSTEM = `You are a task router. Given a task description, return ONLY a JSON array of capability strings needed, in execution order.
+
+Available: ["research","risk","coding","design","audit","report"]
+
+Rules:
+- For CODE tasks (build, create, implement, write code, smart contract, script, CLI, app): return ["coding","report"] — do NOT add research/risk/audit unless explicitly asked
+- For BUSINESS/STRATEGY tasks: ["research","risk","audit","report"]
+- For DESIGN tasks: ["design","report"]
+- For MIXED tasks (e.g. dApp with market research): ["research","coding","design","report"]
+- Always end with "report"
+- Output ONLY the JSON array, nothing else
+
+Examples:
+"write a solidity ERC-20 token" → ["coding","report"]
+"build a React dashboard" → ["coding","design","report"]
+"market analysis for AI startups" → ["research","risk","audit","report"]
+"create a Web3 NFT marketplace dApp" → ["research","coding","design","report"]`;
     const raw = await veniceChat(SYSTEM, description, "mistral-small-3-2-24b-instruct");
     const cleaned = raw.replace(/```[a-z]*\n?/g, "").replace(/```/g, "").trim();
     const capabilities = JSON.parse(cleaned) as string[];

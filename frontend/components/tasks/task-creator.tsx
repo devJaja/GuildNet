@@ -245,7 +245,11 @@ export function TaskCreator({ onTaskComplete }: Props) {
                 </button>
                 {isOpen && (
                   <div className="border-t border-white/5">
-                    <div className="px-4 py-4 text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">{val}</div>
+                    <div className={`px-4 py-4 text-sm leading-relaxed max-h-[600px] overflow-y-auto ${
+                      key === "coding" || (key === "report" && val.includes("// === FILE:"))
+                        ? "font-mono text-green-300 bg-black/30 whitespace-pre text-xs"
+                        : "text-zinc-300 whitespace-pre-wrap"
+                    }`}>{val}</div>
                     {/* Enhance input */}
                     <div className="px-4 pb-4 flex gap-2">
                       <input

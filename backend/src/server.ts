@@ -147,7 +147,20 @@ Examples:
 "create a Web3 NFT marketplace dApp" → ["research","coding","design","report"]`;
     const raw = await veniceChat(SYSTEM, description, "mistral-small-3-2-24b-instruct");
     const cleaned = raw.replace(/```[a-z]*\n?/g, "").replace(/```/g, "").trim();
-    const capabilities = JSON.parse(cleaned) as string[];
+    // Extract JSON array even if the model adds extra text
+    const match = cleaned.match(/\[.*?\]/s);
+    let capabilities: string[];
+    try {
+      capabilities = JSON.parse(match?.[0] ?? cleaned) as string[];
+    } catch {
+      // Fallback: infer from keywords
+      const d = description.toLowerCase();
+      const isCoding = /build|code|implement|contract|solidity|script|app|cli/.test(d);
+      const isDesign = /design|ui|ux|frontend|layout/.test(d);
+      capabilities = isCoding
+        ? (isDesign ? ["coding","design","report"] : ["coding","report"])
+        : ["research","risk","audit","report"];
+    }
     res.json({ capabilities });
   } catch (err) { next(err); }
 });

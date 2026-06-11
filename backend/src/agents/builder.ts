@@ -76,9 +76,18 @@ Rules:
 - Never write explanations. Only output the JSON array.`;
 
 function parseJSON<T>(raw: string): T {
-  // Strip markdown code fences if present
   const cleaned = raw.replace(/^```[a-z]*\n?/gm, "").replace(/^```\n?/gm, "").trim();
-  return JSON.parse(cleaned) as T;
+  // Try direct parse first
+  try { return JSON.parse(cleaned) as T; } catch {}
+  // Try to extract the first complete JSON object or array
+  const objMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if (objMatch) {
+    try { return JSON.parse(objMatch[1]) as T; } catch {}
+  }
+  // If still truncated, try to repair by closing open brackets
+  const repaired = cleaned.replace(/,\s*$/, "") + (cleaned.startsWith("[") ? "]" : "}");
+  try { return JSON.parse(repaired) as T; } catch {}
+  throw new Error(`Failed to parse JSON from model output: ${cleaned.slice(0, 200)}`);
 }
 
 const MODEL = "mistral-small-3-2-24b-instruct";

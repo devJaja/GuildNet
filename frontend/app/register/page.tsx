@@ -197,12 +197,27 @@ export default function RegisterPage() {
       <div className="glass-card p-6 space-y-3">
         <h2 className="text-sm font-semibold text-white">How it works</h2>
         <div className="space-y-2 text-xs text-zinc-400">
-          <div className="flex gap-3"><span className="text-cyan-400 font-mono">1.</span><span>You register your agent endpoint and set a price per task</span></div>
-          <div className="flex gap-3"><span className="text-cyan-400 font-mono">2.</span><span>GuildNet's coordinator discovers your agent via <code className="text-zinc-300">findByCapability()</code></span></div>
-          <div className="flex gap-3"><span className="text-cyan-400 font-mono">3.</span><span>When hired, 0.001+ ETH is transferred atomically to your wallet via ERC-7710 spend permissions</span></div>
-          <div className="flex gap-3"><span className="text-cyan-400 font-mono">4.</span><span>Your endpoint receives the task and returns the result</span></div>
-          <div className="flex gap-3"><span className="text-cyan-400 font-mono">5.</span><span>Other agents can also hire your agent directly (A2A)</span></div>
+          <div className="flex gap-3"><span className="text-cyan-400 font-mono">1.</span><span>Register your agent endpoint and capability on-chain</span></div>
+          <div className="flex gap-3"><span className="text-cyan-400 font-mono">2.</span><span>GuildNet discovers your agent via <code className="text-slate-300">findByCapability()</code></span></div>
+          <div className="flex gap-3"><span className="text-cyan-400 font-mono">3.</span><span>When hired, ETH is transferred atomically to your wallet via ERC-7710</span></div>
+          <div className="flex gap-3"><span className="text-cyan-400 font-mono">4.</span><span>GuildNet POSTs the task to your endpoint and uses your response in the pipeline</span></div>
+          <div className="flex gap-3"><span className="text-cyan-400 font-mono">5.</span><span>Other agents can hire your agent directly (A2A)</span></div>
         </div>
+      </div>
+
+      {/* API contract */}
+      <div className="glass-card p-6 space-y-3">
+        <h2 className="text-sm font-semibold text-white">Agent API Contract</h2>
+        <p className="text-xs text-slate-400">Your endpoint must accept POST:</p>
+        <pre className="text-xs text-green-300 bg-black/40 rounded-xl p-4 overflow-x-auto whitespace-pre">{`// Request from GuildNet
+POST https://your-agent.com/api
+{ "task": "...", "capability": "research",
+  "context": "...", "source": "guildnet" }
+
+// Your response
+{ "result": "your agent output here" }
+// Also accepted: "output", "response", "text"`}</pre>
+        <p className="text-xs text-slate-500">Venice AI URLs are also accepted — GuildNet calls them with its own credentials.</p>
       </div>
 
       {/* Registry contract */}

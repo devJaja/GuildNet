@@ -7,6 +7,65 @@ import { runReport } from "./agents/report";
 import { runCoding } from "./agents/coding";
 import { runDesign } from "./agents/design";
 import { runAudit } from "./agents/audit";
+import { veniceChat } from "./agents/venice.js";
+
+const VENICE_HOST = "api.venice.ai";
+
+/**
+ * Run an agent by capability.
+ * - If the registered endpoint is a Venice AI URL → use internal Venice client (fast, authenticated)
+ * - If it's an external URL → POST the task to the developer's own agent endpoint
+ */
+async function callAgent(
+  agentAddress: Address,
+  capability: string,
+  taskDescription: string,
+  context = ""
+): Promise<string> {
+  // Read the agent's endpoint from registry
+  const agentData = await publicClient.readContract({
+    address: config.contracts.agentRegistry,
+    abi: agentRegistryAbi,
+    functionName: "agents",
+    args: [agentAddress],
+  }) as { endpoint: string; capability: string };
+
+  const endpoint = agentData.endpoint;
+  const isVenice = endpoint.includes(VENICE_HOST) || !endpoint.startsWith("http");
+
+  if (isVenice) {
+    // Use internal Venice client — same as before
+    const prompt = context ? `Task: ${taskDescription}\n\nContext:\n${context}` : taskDescription;
+    const SYSTEM_MAP: Record<string, string> = {
+      research: "You are a market research specialist. Produce concise, factual research: key players, market size, growth trends.",
+      risk:     "You are a risk analysis specialist. Identify key risks and rate each High/Medium/Low. Be concise.",
+      coding:   "You are a senior software engineer. Output ONLY complete, runnable code. No explanations.",
+      design:   "You are a UI/UX design specialist. Produce detailed design specifications.",
+      audit:    "You are a quality auditor. Review outputs for accuracy. Give a verdict (PASS/FAIL/NEEDS_REVISION).",
+      report:   "You are a deliverable compiler. Match output format to what was requested — code for code tasks, report for analysis tasks.",
+    };
+    return veniceChat(SYSTEM_MAP[capability] ?? SYSTEM_MAP.research, prompt, "mistral-small-3-2-24b-instruct");
+  }
+
+  // External agent endpoint — POST the task and get the result
+  console.log(`[Coordinator] Calling external agent at ${endpoint}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000);
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task: taskDescription, capability, context, source: "guildnet" }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Agent endpoint returned HTTP ${res.status}`);
+    const data = await res.json() as { result?: string; output?: string; response?: string; text?: string };
+    // Accept any common response field name
+    return data.result ?? data.output ?? data.response ?? data.text ?? await res.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export interface TaskResult {
   taskId: bigint;
@@ -98,19 +157,12 @@ export async function runCoordinator(
   }));
 
   // ── Wave 1: research + coding + design — Venice runs in parallel, hires are sequential ──
-  // Venice AI calls are parallelized; on-chain hireAgent calls are sequential to avoid nonce collisions.
   const wave1 = capabilities.filter(c => ["research","coding","design"].includes(c));
   if (wave1.length > 0) {
     console.log(`[Coordinator] Wave 1 (Venice parallel, hire sequential): ${wave1.join(", ")}`);
-
-    // Run all Venice AI calls in parallel
     const veniceResults = await Promise.all(wave1.map(cap =>
-      cap === "research" ? runResearch(taskDescription)
-        : cap === "coding" ? runCoding(taskDescription, taskDescription)
-        : runDesign(taskDescription, "")
+      callAgent(agentMap[cap]!, cap, taskDescription)
     ));
-
-    // Hire agents sequentially (one nonce at a time)
     for (let i = 0; i < wave1.length; i++) {
       const cap = wave1[i];
       const tx = await hireAgent(result.taskId, agentMap[cap]!);
@@ -127,36 +179,40 @@ export async function runCoordinator(
     console.log("[Coordinator] Wave 2: risk");
     const [tx, output] = await Promise.all([
       hireAgent(result.taskId, agentMap.risk!),
-      runRiskAnalysis(taskDescription, result.research ?? ""),
+      callAgent(agentMap.risk!, "risk", taskDescription, (result.research ?? "").slice(0, 1500)),
     ]);
     txHashes.push(tx); agentsHired.push(agentMap.risk!);
     result.riskAnalysis = output;
     console.log("[Coordinator] Risk complete");
   }
 
-  // ── Wave 3: audit (uses all prior outputs) ────────────────────────────────
+  // ── Wave 3: audit ────────────────────────────────────────────────────────
   if (capabilities.includes("audit")) {
     console.log("[Coordinator] Wave 3: audit");
-    const outputs: Record<string, string> = {};
-    if (result.research)     outputs.research = result.research;
-    if (result.riskAnalysis) outputs.risk     = result.riskAnalysis;
-    if (result.coding)       outputs.coding   = result.coding;
-    if (result.design)       outputs.design   = result.design;
+    const ctx = Object.entries({
+      research: result.research, risk: result.riskAnalysis,
+      coding: result.coding, design: result.design,
+    }).filter(([,v]) => v).map(([k,v]) => `[${k}]\n${v!.slice(0,600)}`).join("\n\n");
     const [tx, output] = await Promise.all([
       hireAgent(result.taskId, agentMap.audit!),
-      runAudit(taskDescription, outputs),
+      callAgent(agentMap.audit!, "audit", taskDescription, ctx),
     ]);
     txHashes.push(tx); agentsHired.push(agentMap.audit!);
     result.audit = output;
     console.log("[Coordinator] Audit complete");
   }
 
-  // ── Wave 4: report (final, uses everything) ───────────────────────────────
+  // ── Wave 4: report ───────────────────────────────────────────────────────
   if (capabilities.includes("report")) {
     console.log("[Coordinator] Wave 4: report");
+    const ctx = [
+      result.research?.slice(0,1000),
+      result.riskAnalysis?.slice(0,800),
+      result.audit?.slice(0,500),
+    ].filter(Boolean).join("\n\n");
     const [tx, output] = await Promise.all([
       hireAgent(result.taskId, agentMap.report!),
-      runReport(taskDescription, result.research ?? "", result.riskAnalysis ?? "", result.audit),
+      callAgent(agentMap.report!, "report", taskDescription, ctx),
     ]);
     txHashes.push(tx); agentsHired.push(agentMap.report!);
     result.report = output;

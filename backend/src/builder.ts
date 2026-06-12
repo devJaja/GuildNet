@@ -96,12 +96,11 @@ export async function buildProject(prompt: string, baseOutputDir = "/tmp/guildne
   const buildLog = runCmd(plan.buildCmd, outputDir);
   const success = !(/build failed|compilation failed/i.test(buildLog));
 
-  // Start live preview server
+  // Start live preview server (local dev only — not available on cloud deployments)
   let previewUrl: string | undefined;
-  if (success) {
+  if (success && process.env.NODE_ENV !== "production") {
     const port = getFreePort();
     startPreviewServer(outputDir, plan, port);
-    // Give it 2s to boot
     await new Promise(r => setTimeout(r, 2000));
     previewUrl = `http://localhost:${port}`;
     console.log(`[Builder] Live preview: ${previewUrl}`);

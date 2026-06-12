@@ -8,7 +8,10 @@ import { runAgent, type Capability } from "./agentRunner";
 import { buildProject } from "./builder";
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGIN ?? "*",
+  methods: ["GET", "POST"],
+}));
 app.use(express.json());
 
 const limiter = rateLimit({ windowMs: 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
@@ -49,6 +52,7 @@ app.post("/task", limiter, async (req: Request, res: Response, next: NextFunctio
       design:       result.design,
       audit:        result.audit,
       report:       result.report,
+      previewUrl:   result.previewUrl,
     });
   } catch (err) { next(err); }
 });

@@ -192,9 +192,10 @@ app.post("/build", limiter, async (req: Request, res: Response, next: NextFuncti
     res.json({
       success:   result.success,
       outputDir: result.outputDir,
+      previewUrl: result.previewUrl,
       plan:      result.plan,
       files:     result.files.map(f => ({ path: f.path, size: f.content.length })),
-      buildLog:  result.buildLog.slice(-2000), // last 2000 chars
+      buildLog:  result.buildLog.slice(-2000),
     });
   } catch (err) { next(err); }
 });

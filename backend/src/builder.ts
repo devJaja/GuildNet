@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execSync, spawn } from "child_process";
 import { mkdirSync, writeFileSync } from "fs";
 import { join, dirname } from "path";
 import { runArchitect, runCoder, runDesigner, runReviewer, type ProjectFile, type BuildPlan } from "./agents/builder.js";
@@ -10,6 +10,17 @@ export interface BuildResult {
   outputDir: string;
   buildLog: string;
   success: boolean;
+  previewUrl?: string;
+}
+
+// Track running preview servers so we can reuse ports
+const usedPorts = new Set<number>();
+let nextPort = 4000;
+
+function getFreePort(): number {
+  while (usedPorts.has(nextPort)) nextPort++;
+  usedPorts.add(nextPort);
+  return nextPort++;
 }
 
 function writeFiles(outputDir: string, files: ProjectFile[]) {
@@ -28,6 +39,35 @@ function runCmd(cmd: string, cwd: string): string {
   }
 }
 
+function startPreviewServer(outputDir: string, plan: BuildPlan, port: number): void {
+  // Determine the right start command for the framework
+  let startCmd: string;
+  let args: string[];
+
+  if (plan.framework === "nextjs") {
+    // next start needs PORT env
+    startCmd = "node_modules/.bin/next";
+    args = ["start", "-p", String(port)];
+  } else if (plan.framework.startsWith("vite")) {
+    startCmd = "node_modules/.bin/vite";
+    args = ["preview", "--port", String(port), "--host"];
+  } else {
+    // fallback: serve the dist folder with npx serve
+    startCmd = "node_modules/.bin/serve";
+    args = ["-l", String(port), "dist"];
+    runCmd("npm install serve --save-dev", outputDir);
+  }
+
+  const child = spawn(startCmd, args, {
+    cwd: outputDir,
+    detached: true,
+    stdio: "ignore",
+    env: { ...process.env, PORT: String(port) },
+  });
+  child.unref(); // Don't block the parent process
+  console.log(`[Builder] Preview server started on port ${port} (pid ${child.pid})`);
+}
+
 export async function buildProject(prompt: string, baseOutputDir = "/tmp/guildnet-builds"): Promise<BuildResult> {
   const slug = prompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
   const outputDir = join(baseOutputDir, `${slug}-${Date.now()}`);
@@ -44,8 +84,6 @@ export async function buildProject(prompt: string, baseOutputDir = "/tmp/guildne
     runDesigner(prompt, files),
     runReviewer(prompt, files),
   ]);
-
-  // Merge: reviewer fixes take priority, then designer polish
   const map = new Map(designed.map(f => [f.path, f]));
   for (const f of reviewed) map.set(f.path, f);
   files = Array.from(map.values());
@@ -58,9 +96,19 @@ export async function buildProject(prompt: string, baseOutputDir = "/tmp/guildne
 
   console.log("[Builder] Building...");
   const buildLog = runCmd(plan.buildCmd, outputDir);
-
   const success = !buildLog.toLowerCase().includes("error");
-  console.log(`[Builder] Done — success=${success}`);
 
-  return { prompt, plan, files, outputDir, buildLog: installLog + "\n" + buildLog, success };
+  // Start live preview server
+  let previewUrl: string | undefined;
+  if (success) {
+    const port = getFreePort();
+    startPreviewServer(outputDir, plan, port);
+    // Give it 2s to boot
+    await new Promise(r => setTimeout(r, 2000));
+    previewUrl = `http://localhost:${port}`;
+    console.log(`[Builder] Live preview: ${previewUrl}`);
+  }
+
+  console.log(`[Builder] Done — success=${success}`);
+  return { prompt, plan, files, outputDir, buildLog: installLog + "\n" + buildLog, success, previewUrl };
 }

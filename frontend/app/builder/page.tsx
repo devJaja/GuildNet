@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Wand2, Loader2, CheckCircle, AlertCircle, FileCode, ExternalLink } from "lucide-react";
+import { Wand2, Loader2, CheckCircle, AlertCircle, FileCode, ExternalLink, Monitor } from "lucide-react";
 import { BACKEND_URL } from "@/lib/constants";
 
 interface BuildResult {
   success: boolean;
   outputDir: string;
+  previewUrl?: string;
   plan: { stack: string; description: string; devCmd: string };
   files: { path: string; size: number }[];
   buildLog: string;
@@ -25,84 +26,68 @@ export default function BuilderPage() {
   const [result,  setResult]  = useState<BuildResult | null>(null);
   const [error,   setError]   = useState("");
   const [stage,   setStage]   = useState("");
+  const [preview, setPreview] = useState(false);
 
-  const STAGES = ["🏗️ Architecting...", "💻 Writing code...", "🎨 Polishing UI + reviewing...", "📦 Building..."];
+  const STAGES = ["🏗️ Architecting...", "💻 Writing code...", "🎨 Polishing UI + reviewing...", "📦 Building...", "🚀 Starting preview..."];
 
   async function handleBuild() {
     if (!prompt.trim() || loading) return;
-    setLoading(true); setResult(null); setError(""); setStage(STAGES[0]);
+    setLoading(true); setResult(null); setError(""); setPreview(false); setStage(STAGES[0]);
 
     let si = 0;
-    const ticker = setInterval(() => {
-      si = Math.min(si + 1, STAGES.length - 1);
-      setStage(STAGES[si]);
-    }, 25_000);
+    const ticker = setInterval(() => { si = Math.min(si + 1, STAGES.length - 1); setStage(STAGES[si]); }, 22_000);
 
     try {
       const res = await fetch(`${BACKEND_URL}/build`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
         signal: AbortSignal.timeout(300_000),
       });
       clearInterval(ticker);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(err.error ?? res.statusText);
-      }
-      setResult(await res.json());
+      if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? res.statusText); }
+      const data: BuildResult = await res.json();
+      setResult(data);
+      if (data.previewUrl) setPreview(true);
     } catch (e: unknown) {
       clearInterval(ticker);
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false); setStage("");
-    }
+    } finally { setLoading(false); setStage(""); }
   }
 
   return (
-    <div className="space-y-8 animate-slide-up max-w-3xl">
+    <div className="space-y-6 stagger">
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2">
-          AI <span className="gradient-text">Builder</span>
-        </h1>
-        <p className="text-zinc-400">One prompt → full working website or dApp. No explanations. Just code.</p>
+        <h1 className="text-2xl font-bold text-white">AI <span className="gradient-text">Builder</span></h1>
+        <p className="text-sm text-slate-400 mt-1">One prompt → full working website or dApp, live and clickable.</p>
       </div>
 
       {/* Input */}
       <div className="glass-card p-6 space-y-4">
         <div className="relative">
-          <textarea
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
+          <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && e.metaKey) handleBuild(); }}
             placeholder="Describe what you want to build... (⌘+Enter)"
-            className="w-full h-28 bg-white/5 border border-white/10 rounded-xl p-4 pr-14 text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 resize-none transition-all"
-            disabled={loading}
-          />
+            className="input-base p-4 pr-14 h-28 resize-none text-sm" disabled={loading} />
           <button onClick={handleBuild} disabled={!prompt.trim() || loading}
-            className="absolute bottom-4 right-4 p-2 bg-gradient-to-r from-cyan-500 to-violet-600 rounded-lg text-white disabled:opacity-40 hover:opacity-90 transition-opacity">
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Wand2 className="w-5 h-5" />}
+            className="btn-primary absolute bottom-4 right-4 p-2.5 rounded-xl">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
           </button>
         </div>
-
-        {/* Examples */}
         <div className="flex flex-wrap gap-2">
           {EXAMPLES.map(ex => (
             <button key={ex} onClick={() => setPrompt(ex)} disabled={loading}
-              className="px-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-lg text-zinc-400 hover:text-white hover:border-cyan-500/30 transition-all">
-              {ex}
-            </button>
+              className="btn-ghost px-3 py-1.5 text-xs rounded-lg">{ex}</button>
           ))}
         </div>
       </div>
 
       {/* Progress */}
       {loading && (
-        <div className="glass-card p-6 flex items-center gap-4">
+        <div className="glass-card p-5 flex items-center gap-4">
           <Loader2 className="w-5 h-5 text-cyan-400 animate-spin flex-shrink-0" />
           <div>
-            <p className="text-white font-medium">{stage}</p>
-            <p className="text-xs text-zinc-500 mt-1">4 AI agents working in parallel · ~90 seconds</p>
+            <p className="text-white font-medium text-sm">{stage}</p>
+            <p className="text-xs text-slate-500 mt-0.5">4 AI agents · ~90 seconds · full project with live preview</p>
           </div>
         </div>
       )}
@@ -118,36 +103,48 @@ export default function BuilderPage() {
       {/* Result */}
       {result && (
         <div className="space-y-4">
-          <div className={`flex items-center gap-3 p-4 rounded-xl border ${
-            result.success ? "bg-green-500/10 border-green-500/30" : "bg-amber-500/10 border-amber-500/30"
-          }`}>
+          {/* Status bar */}
+          <div className={`flex items-center gap-3 p-4 rounded-xl border ${result.success ? "bg-green-500/10 border-green-500/30" : "bg-amber-500/10 border-amber-500/30"}`}>
             <CheckCircle className={`w-5 h-5 flex-shrink-0 ${result.success ? "text-green-400" : "text-amber-400"}`} />
-            <div>
-              <p className={`font-medium ${result.success ? "text-green-400" : "text-amber-400"}`}>
+            <div className="flex-1">
+              <p className={`font-medium text-sm ${result.success ? "text-green-400" : "text-amber-400"}`}>
                 {result.success ? "Build successful" : "Build completed with warnings"}
               </p>
-              <p className="text-xs text-zinc-500 mt-0.5">{result.plan.stack} · {result.files.length} files</p>
+              <p className="text-xs text-slate-500 mt-0.5">{result.plan.stack} · {result.files.length} files generated</p>
             </div>
+            {result.previewUrl && (
+              <a href={result.previewUrl} target="_blank" rel="noreferrer"
+                className="flex items-center gap-1.5 btn-primary px-4 py-2 text-xs rounded-xl flex-shrink-0">
+                <ExternalLink className="w-3.5 h-3.5" /> Open Site
+              </a>
+            )}
           </div>
 
-          {/* Plan */}
-          <div className="glass-card p-4 space-y-2">
-            <p className="text-sm text-zinc-400">{result.plan.description}</p>
-            <code className="text-xs text-cyan-400 block">{result.outputDir}</code>
-            <code className="text-xs text-zinc-500 block">Run: {result.plan.devCmd}</code>
-          </div>
+          {/* Live preview iframe */}
+          {result.previewUrl && preview && (
+            <div className="glass-card overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.06]">
+                <Monitor className="w-4 h-4 text-cyan-400" />
+                <span className="text-sm font-medium text-white">Live Preview</span>
+                <code className="text-xs text-slate-500 ml-auto">{result.previewUrl}</code>
+                <button onClick={() => setPreview(false)} className="text-slate-500 hover:text-white text-xs">✕</button>
+              </div>
+              <iframe src={result.previewUrl} className="w-full border-0" style={{ height: "600px" }}
+                title="Live Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
+            </div>
+          )}
 
           {/* File list */}
           <div className="glass-card p-4">
-            <p className="text-sm font-medium text-white mb-3">Generated Files</p>
+            <p className="text-xs font-medium text-white mb-3">Generated Files</p>
             <div className="space-y-1.5">
               {result.files.map(f => (
                 <div key={f.path} className="flex items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2">
-                    <FileCode className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
-                    <code className="text-zinc-300">{f.path}</code>
+                    <FileCode className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                    <code className="text-slate-300">{f.path}</code>
                   </div>
-                  <span className="text-zinc-600">{(f.size / 1024).toFixed(1)}kb</span>
+                  <span className="text-slate-600">{(f.size / 1024).toFixed(1)}kb</span>
                 </div>
               ))}
             </div>
@@ -156,8 +153,8 @@ export default function BuilderPage() {
           {/* Build log */}
           {result.buildLog && (
             <details className="glass-card p-4">
-              <summary className="text-sm text-zinc-400 cursor-pointer hover:text-white">Build log</summary>
-              <pre className="mt-3 text-xs text-zinc-500 overflow-auto max-h-48 whitespace-pre-wrap">{result.buildLog}</pre>
+              <summary className="text-xs text-slate-400 cursor-pointer hover:text-white">Build log</summary>
+              <pre className="mt-3 text-xs text-slate-500 overflow-auto max-h-48 whitespace-pre-wrap">{result.buildLog}</pre>
             </details>
           )}
         </div>

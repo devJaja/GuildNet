@@ -14,7 +14,8 @@ const PIPELINE_LABELS: Record<string, string> = {
 };
 const OUTPUT_LABELS: Record<string, string> = {
   research: "🔍 Research", riskAnalysis: "⚠️ Risk Analysis",
-  coding: "💻 Code", design: "🎨 Design Preview", audit: "✅ Audit", report: "📄 Final Report",
+  coding: "🚀 Live App", design: "🎨 Design Preview",
+  audit: "✅ Audit", report: "📄 Final Report",
 };
 const CREATE_TASK_ABI = [{
   name: "createTask", type: "function", stateMutability: "payable",
@@ -250,28 +251,43 @@ export function TaskCreator({ onTaskComplete }: Props) {
                 </button>
                 {isOpen && (
                   <div className="border-t border-white/5">
-                    {/* Design: render as live interactive HTML iframe */}
-                    {key === "design" ? (
+                    {/* Design OR Coding: render as live interactive HTML iframe */}
+                    {(key === "design" || (key === "coding" && (val.includes("<!DOCTYPE") || val.includes("<html")))) ? (
                       <div>
                         <div className="flex items-center justify-between px-4 py-2 bg-black/20 border-b border-white/5">
-                          <span className="text-xs text-slate-400">Live interactive preview — click, scroll, interact</span>
-                          <button
-                            onClick={() => {
-                              const blob = new Blob([val], { type: "text/html" });
-                              const url = URL.createObjectURL(blob);
-                              window.open(url, "_blank");
-                            }}
-                            className="text-xs text-cyan-400 hover:underline flex items-center gap-1"
-                          >
-                            Open fullscreen ↗
-                          </button>
+                          <span className="text-xs text-slate-400">
+                            {key === "coding" ? "✅ Live app — fully interactive, click anything" : "Live design preview — click, scroll, interact"}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => {
+                                const blob = new Blob([val], { type: "text/html" });
+                                const a = document.createElement("a");
+                                a.href = URL.createObjectURL(blob);
+                                a.download = `${key}-output.html`;
+                                a.click();
+                              }}
+                              className="text-xs text-slate-400 hover:text-white"
+                            >
+                              ↓ Download
+                            </button>
+                            <button
+                              onClick={() => {
+                                const blob = new Blob([val], { type: "text/html" });
+                                window.open(URL.createObjectURL(blob), "_blank");
+                              }}
+                              className="text-xs text-cyan-400 hover:underline"
+                            >
+                              Open fullscreen ↗
+                            </button>
+                          </div>
                         </div>
                         <iframe
                           srcDoc={val}
                           className="w-full border-0"
-                          style={{ height: "600px" }}
+                          style={{ height: "640px" }}
                           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                          title="Design Preview"
+                          title={key === "coding" ? "Live App" : "Design Preview"}
                         />
                       </div>
                     ) : (

@@ -120,36 +120,68 @@ app.post("/verify-endpoint", limiter, async (req: Request, res: Response, next: 
 
 /**
  * POST /suggest-agents
- * Deterministic keyword-based pipeline selection — no Venice call, instant response.
+ * Deterministic routing — reads live capabilities from chain, matches to task keywords.
  */
-app.post("/suggest-agents", limiter, async (req: Request, res: Response) => {
-  const { description = "" } = req.body as { description: string };
-  const d = description.toLowerCase();
+app.post("/suggest-agents", limiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { description = "" } = req.body as { description: string };
+    const d = description.toLowerCase();
 
-  const hasCoding  = /\b(build|code|implement|write|create|develop|program|script|solidity|smart contract|dapp|app|cli|api|backend|frontend|website|web app|react|next|vue|angular|node|express|fastapi|django|flask)\b/.test(d);
-  const hasDesign  = /\b(design|ui|ux|interface|layout|figma|wireframe|mockup|visual|landing page|dashboard|component|style|theme|css|tailwind|dark mode)\b/.test(d);
-  const hasBiz     = /\b(market|research|analysis|strategy|business|competitor|risk|report|study|survey|industry|trend|revenue|startup|investment|growth|audit)\b/.test(d);
-  const hasCode    = hasCoding && !hasBiz;
-  const hasMixed   = hasCoding && hasBiz;
+    // Fetch all registered capabilities from chain
+    const { createPublicClient, http } = await import("viem");
+    const registryAbi = [
+      { name: "totalAgents", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+      { name: "agentList",   type: "function", stateMutability: "view", inputs: [{ name: "", type: "uint256" }], outputs: [{ type: "address" }] },
+      { name: "agents",      type: "function", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ name: "", type: "tuple", components: [{ name: "wallet", type: "address" }, { name: "endpoint", type: "string" }, { name: "capability", type: "string" }, { name: "pricePerTask", type: "uint256" }, { name: "active", type: "bool" }] }] },
+    ] as const;
+    const chainDef = { id: Number(config.chainId), name: "GuildNet", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [config.rpcUrl] } } };
+    const client = createPublicClient({ chain: chainDef, transport: http(config.rpcUrl) });
 
-  let capabilities: string[];
+    let registeredCaps: string[] = [];
+    try {
+      const total = await client.readContract({ address: config.contracts.agentRegistry, abi: registryAbi, functionName: "totalAgents" }) as bigint;
+      const addresses = await Promise.all(
+        Array.from({ length: Number(total) }, (_, i) =>
+          client.readContract({ address: config.contracts.agentRegistry, abi: registryAbi, functionName: "agentList", args: [BigInt(i)] }) as Promise<`0x${string}`>
+        )
+      );
+      const agentData = await Promise.all(addresses.map(addr =>
+        client.readContract({ address: config.contracts.agentRegistry, abi: registryAbi, functionName: "agents", args: [addr] }) as Promise<{ capability: string; active: boolean }>
+      ));
+      registeredCaps = [...new Set(agentData.filter(a => a.active).map(a => a.capability))];
+    } catch { registeredCaps = ["research","risk","coding","design","audit","report"]; }
 
-  if (hasMixed) {
-    capabilities = hasDesign
-      ? ["research", "coding", "design", "audit", "report"]
-      : ["research", "coding", "audit", "report"];
-  } else if (hasCode) {
-    capabilities = hasDesign
-      ? ["coding", "design", "report"]
-      : ["coding", "report"];
-  } else if (hasDesign) {
-    capabilities = ["design", "report"];
-  } else {
-    // default: business/research task
-    capabilities = ["research", "risk", "audit", "report"];
-  }
+    // Core routing logic
+    const hasCoding  = /\b(build|code|implement|write|create|develop|program|script|solidity|smart contract|dapp|app|cli|api|backend|frontend|website|web app|react|next|vue|angular|node|express)\b/.test(d);
+    const hasDesign  = /\b(design|ui|ux|interface|layout|figma|wireframe|visual|landing page|dashboard|component|style|theme|css|tailwind)\b/.test(d);
+    const hasBiz     = /\b(market|research|analysis|strategy|business|competitor|risk|report|study|survey|industry|trend|startup|investment|growth)\b/.test(d);
+    const hasMixed   = hasCoding && hasBiz;
 
-  res.json({ capabilities });
+    let base: string[];
+    if (hasMixed)        base = hasDesign ? ["research","coding","design","audit","report"] : ["research","coding","audit","report"];
+    else if (hasCoding)  base = hasDesign ? ["coding","design","report"] : ["coding","report"];
+    else if (hasDesign)  base = ["design","report"];
+    else                 base = ["research","risk","audit","report"];
+
+    // Add any registered custom capabilities that match keywords in the description
+    const customCaps = registeredCaps.filter(cap =>
+      !base.includes(cap) &&
+      !["research","risk","coding","design","audit","report"].includes(cap) &&
+      d.includes(cap.toLowerCase())
+    );
+    // Insert custom caps before "report"
+    const reportIdx = base.indexOf("report");
+    const capabilities = reportIdx >= 0
+      ? [...base.slice(0, reportIdx), ...customCaps, ...base.slice(reportIdx)]
+      : [...base, ...customCaps];
+
+    // Only keep capabilities that have a registered agent
+    const filtered = capabilities.filter(c => registeredCaps.includes(c));
+    // Always ensure "report" is last if registered
+    if (!filtered.includes("report") && registeredCaps.includes("report")) filtered.push("report");
+
+    res.json({ capabilities: filtered.length > 0 ? filtered : base });
+  } catch (err) { next(err); }
 });
 
 /**

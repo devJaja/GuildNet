@@ -120,49 +120,36 @@ app.post("/verify-endpoint", limiter, async (req: Request, res: Response, next: 
 
 /**
  * POST /suggest-agents
- * Given a task description, returns the optimal capability pipeline.
+ * Deterministic keyword-based pipeline selection — no Venice call, instant response.
  */
-app.post("/suggest-agents", limiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { description } = req.body as { description: string };
-    if (!description?.trim()) { res.status(400).json({ error: "description is required" }); return; }
+app.post("/suggest-agents", limiter, async (req: Request, res: Response) => {
+  const { description = "" } = req.body as { description: string };
+  const d = description.toLowerCase();
 
-    const { veniceChat } = await import("./agents/venice.js");
-    const SYSTEM = `You are a task router. Given a task description, return ONLY a JSON array of capability strings needed, in execution order.
+  const hasCoding  = /\b(build|code|implement|write|create|develop|program|script|solidity|smart contract|dapp|app|cli|api|backend|frontend|website|web app|react|next|vue|angular|node|express|fastapi|django|flask)\b/.test(d);
+  const hasDesign  = /\b(design|ui|ux|interface|layout|figma|wireframe|mockup|visual|landing page|dashboard|component|style|theme|css|tailwind|dark mode)\b/.test(d);
+  const hasBiz     = /\b(market|research|analysis|strategy|business|competitor|risk|report|study|survey|industry|trend|revenue|startup|investment|growth|audit)\b/.test(d);
+  const hasCode    = hasCoding && !hasBiz;
+  const hasMixed   = hasCoding && hasBiz;
 
-Available: ["research","risk","coding","design","audit","report"]
+  let capabilities: string[];
 
-Rules:
-- For CODE tasks (build, create, implement, write code, smart contract, script, CLI, app): return ["coding","report"] — do NOT add research/risk/audit unless explicitly asked
-- For BUSINESS/STRATEGY tasks: ["research","risk","audit","report"]
-- For DESIGN tasks: ["design","report"]
-- For MIXED tasks (e.g. dApp with market research): ["research","coding","design","report"]
-- Always end with "report"
-- Output ONLY the JSON array, nothing else
+  if (hasMixed) {
+    capabilities = hasDesign
+      ? ["research", "coding", "design", "audit", "report"]
+      : ["research", "coding", "audit", "report"];
+  } else if (hasCode) {
+    capabilities = hasDesign
+      ? ["coding", "design", "report"]
+      : ["coding", "report"];
+  } else if (hasDesign) {
+    capabilities = ["design", "report"];
+  } else {
+    // default: business/research task
+    capabilities = ["research", "risk", "audit", "report"];
+  }
 
-Examples:
-"write a solidity ERC-20 token" → ["coding","report"]
-"build a React dashboard" → ["coding","design","report"]
-"market analysis for AI startups" → ["research","risk","audit","report"]
-"create a Web3 NFT marketplace dApp" → ["research","coding","design","report"]`;
-    const raw = await veniceChat(SYSTEM, description, "mistral-small-3-2-24b-instruct");
-    const cleaned = raw.replace(/```[a-z]*\n?/g, "").replace(/```/g, "").trim();
-    // Extract JSON array even if the model adds extra text
-    const match = cleaned.match(/\[.*?\]/s);
-    let capabilities: string[];
-    try {
-      capabilities = JSON.parse(match?.[0] ?? cleaned) as string[];
-    } catch {
-      // Fallback: infer from keywords
-      const d = description.toLowerCase();
-      const isCoding = /build|code|implement|contract|solidity|script|app|cli/.test(d);
-      const isDesign = /design|ui|ux|frontend|layout/.test(d);
-      capabilities = isCoding
-        ? (isDesign ? ["coding","design","report"] : ["coding","report"])
-        : ["research","risk","audit","report"];
-    }
-    res.json({ capabilities });
-  } catch (err) { next(err); }
+  res.json({ capabilities });
 });
 
 /**

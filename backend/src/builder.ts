@@ -40,31 +40,29 @@ function runCmd(cmd: string, cwd: string): string {
 }
 
 function startPreviewServer(outputDir: string, plan: BuildPlan, port: number): void {
-  // Determine the right start command for the framework
   let startCmd: string;
   let args: string[];
 
   if (plan.framework === "nextjs") {
-    // next start needs PORT env
+    // Use dev mode — more forgiving for generated code, no prod build needed
     startCmd = "node_modules/.bin/next";
-    args = ["start", "-p", String(port)];
+    args = ["dev", "-p", String(port)];
   } else if (plan.framework.startsWith("vite")) {
     startCmd = "node_modules/.bin/vite";
-    args = ["preview", "--port", String(port), "--host"];
+    args = ["--port", String(port), "--host"];
   } else {
-    // fallback: serve the dist folder with npx serve
+    runCmd("npm install --save-dev serve", outputDir);
     startCmd = "node_modules/.bin/serve";
     args = ["-l", String(port), "dist"];
-    runCmd("npm install serve --save-dev", outputDir);
   }
 
   const child = spawn(startCmd, args, {
     cwd: outputDir,
     detached: true,
     stdio: "ignore",
-    env: { ...process.env, PORT: String(port) },
+    env: { ...process.env, PORT: String(port), NODE_ENV: "development" },
   });
-  child.unref(); // Don't block the parent process
+  child.unref();
   console.log(`[Builder] Preview server started on port ${port} (pid ${child.pid})`);
 }
 
@@ -96,7 +94,7 @@ export async function buildProject(prompt: string, baseOutputDir = "/tmp/guildne
 
   console.log("[Builder] Building...");
   const buildLog = runCmd(plan.buildCmd, outputDir);
-  const success = !buildLog.toLowerCase().includes("error");
+  const success = !(/build failed|compilation failed/i.test(buildLog));
 
   // Start live preview server
   let previewUrl: string | undefined;

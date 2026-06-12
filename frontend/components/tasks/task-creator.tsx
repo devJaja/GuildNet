@@ -253,6 +253,8 @@ export function TaskCreator({ onTaskComplete }: Props) {
                     <div className={`px-4 py-4 text-sm leading-relaxed max-h-[600px] overflow-y-auto ${
                       key === "coding" || (key === "report" && val.includes("// === FILE:"))
                         ? "font-mono text-green-300 bg-black/30 whitespace-pre text-xs"
+                        : key === "design"
+                        ? "font-mono text-violet-200 bg-black/30 whitespace-pre text-xs"
                         : "text-zinc-300 whitespace-pre-wrap"
                     }`}>{val}</div>
                     {/* Enhance input */}

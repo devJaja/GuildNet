@@ -1,7 +1,8 @@
 "use client";
 
-import { Search, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { WalletConnect } from "./wallet-connect";
+import { GlobalSearch } from "./global-search";
 
 interface HeaderProps { onMenuClick: () => void; }
 
@@ -14,13 +15,9 @@ export function Header({ onMenuClick }: HeaderProps) {
         <Menu className="w-5 h-5" />
       </button>
 
-      <div className="relative flex-1 max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600 pointer-events-none" />
-        <input type="text" placeholder="Search agents, tasks…"
-          className="input-base pl-9 pr-4 py-1.5 text-sm" />
-      </div>
+      <GlobalSearch />
 
-      <div className="flex items-center gap-2.5 ml-auto">
+      <div className="flex items-center gap-2.5 ml-auto flex-shrink-0">
         <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/10 border border-green-500/20">
           <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
           <span className="text-xs font-medium text-green-400">Base Sepolia</span>

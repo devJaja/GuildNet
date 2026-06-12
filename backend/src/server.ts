@@ -27,7 +27,7 @@ app.post("/task", limiter, async (req: Request, res: Response, next: NextFunctio
   try {
     const { description, budgetEth = "0.05", durationDays = 7, capabilities } = req.body as {
       description: string; budgetEth?: string; durationDays?: number;
-      capabilities?: ("research" | "risk" | "coding" | "design" | "audit" | "report")[];
+      capabilities?: string[];
     };
     if (!description?.trim()) { res.status(400).json({ error: "description is required" }); return; }
 

@@ -137,7 +137,7 @@ export async function runCoordinator(
   taskDescription: string,
   budgetEth = "0.05",
   durationDays = 7,
-  capabilities: ("research" | "risk" | "coding" | "design" | "audit" | "report")[] = ["research", "risk", "audit", "report"]
+  capabilities: string[] = ["research", "risk", "audit", "report"]
 ): Promise<TaskResult> {
   const durationSecs = BigInt(durationDays * 24 * 60 * 60);
   const txHashes: `0x${string}`[] = [];
@@ -156,10 +156,12 @@ export async function runCoordinator(
     agentMap[cap] = found[0];
   }));
 
-  // ── Wave 1: research + coding + design — Venice runs in parallel, hires are sequential ──
-  const wave1 = capabilities.filter(c => ["research","coding","design"].includes(c));
+  // ── Wave 1: all independent agents run in parallel (Venice), hired sequentially ──
+  // "independent" = everything except risk (needs research), audit (needs all), report (last)
+  const dependents = ["risk", "audit", "report"];
+  const wave1 = capabilities.filter(c => !dependents.includes(c));
   if (wave1.length > 0) {
-    console.log(`[Coordinator] Wave 1 (Venice parallel, hire sequential): ${wave1.join(", ")}`);
+    console.log(`[Coordinator] Wave 1 (parallel): ${wave1.join(", ")}`);
     const veniceResults = await Promise.all(wave1.map(cap =>
       callAgent(agentMap[cap]!, cap, taskDescription)
     ));
@@ -167,9 +169,14 @@ export async function runCoordinator(
       const cap = wave1[i];
       const tx = await hireAgent(result.taskId, agentMap[cap]!);
       txHashes.push(tx); agentsHired.push(agentMap[cap]!);
+      // Store output — known caps in typed fields, custom caps stored in research slot or logged
       if (cap === "research") result.research = veniceResults[i];
-      if (cap === "coding")   result.coding   = veniceResults[i];
-      if (cap === "design")   result.design   = veniceResults[i];
+      else if (cap === "coding")  result.coding  = veniceResults[i];
+      else if (cap === "design")  result.design  = veniceResults[i];
+      else {
+        // Custom capability — append to research context so downstream agents can use it
+        result.research = (result.research ?? "") + `\n\n[${cap.toUpperCase()} AGENT]\n${veniceResults[i]}`;
+      }
     }
     console.log("[Coordinator] Wave 1 complete");
   }

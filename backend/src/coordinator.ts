@@ -72,7 +72,8 @@ export interface TaskResult {
   research?: string;
   riskAnalysis?: string;
   coding?: string;
-  design?: string;
+  design?: string;       // HTML content for visual preview
+  designHtml?: string;   // alias kept for clarity
   audit?: string;
   report: string;
   agentsHired: Address[];

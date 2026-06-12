@@ -14,7 +14,7 @@ const PIPELINE_LABELS: Record<string, string> = {
 };
 const OUTPUT_LABELS: Record<string, string> = {
   research: "🔍 Research", riskAnalysis: "⚠️ Risk Analysis",
-  coding: "💻 Code", design: "🎨 Design", audit: "✅ Audit", report: "📄 Final Report",
+  coding: "💻 Code", design: "🎨 Design Preview", audit: "✅ Audit", report: "📄 Final Report",
 };
 const CREATE_TASK_ABI = [{
   name: "createTask", type: "function", stateMutability: "payable",
@@ -250,19 +250,43 @@ export function TaskCreator({ onTaskComplete }: Props) {
                 </button>
                 {isOpen && (
                   <div className="border-t border-white/5">
-                    <div className={`px-4 py-4 text-sm leading-relaxed max-h-[600px] overflow-y-auto ${
-                      key === "coding" || (key === "report" && val.includes("// === FILE:"))
-                        ? "font-mono text-green-300 bg-black/30 whitespace-pre text-xs"
-                        : key === "design"
-                        ? "font-mono text-violet-200 bg-black/30 whitespace-pre text-xs"
-                        : "text-zinc-300 whitespace-pre-wrap"
-                    }`}>{val}</div>
+                    {/* Design: render as live interactive HTML iframe */}
+                    {key === "design" ? (
+                      <div>
+                        <div className="flex items-center justify-between px-4 py-2 bg-black/20 border-b border-white/5">
+                          <span className="text-xs text-slate-400">Live interactive preview — click, scroll, interact</span>
+                          <button
+                            onClick={() => {
+                              const blob = new Blob([val], { type: "text/html" });
+                              const url = URL.createObjectURL(blob);
+                              window.open(url, "_blank");
+                            }}
+                            className="text-xs text-cyan-400 hover:underline flex items-center gap-1"
+                          >
+                            Open fullscreen ↗
+                          </button>
+                        </div>
+                        <iframe
+                          srcDoc={val}
+                          className="w-full border-0"
+                          style={{ height: "600px" }}
+                          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                          title="Design Preview"
+                        />
+                      </div>
+                    ) : (
+                      <div className={`px-4 py-4 text-sm leading-relaxed max-h-[600px] overflow-y-auto ${
+                        key === "coding" || (key === "report" && val.includes("// === FILE:"))
+                          ? "font-mono text-green-300 bg-black/30 whitespace-pre text-xs"
+                          : "text-zinc-300 whitespace-pre-wrap"
+                      }`}>{val}</div>
+                    )}
                     {/* Enhance input */}
-                    <div className="px-4 pb-4 flex gap-2">
+                    <div className="px-4 pb-4 pt-3 flex gap-2 border-t border-white/5">
                       <input
                         value={feedback[key] ?? ""}
                         onChange={e => setFeedback(prev => ({ ...prev, [key]: e.target.value }))}
-                        placeholder="Request improvements..."
+                        placeholder={key === "design" ? "Request UI changes..." : "Request improvements..."}
                         className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50"
                       />
                       <button onClick={() => handleEnhance(key)} disabled={!feedback[key]?.trim() || enhancing === key}

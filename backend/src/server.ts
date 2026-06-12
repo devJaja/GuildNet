@@ -23,6 +23,9 @@ app.get("/health", (_req: Request, res: Response) => {
  * POST /task
  * Full coordinator loop: discover all agents → hire → Venice AI → complete
  */
+// In-memory store for design HTML (keyed by taskId)
+const designStore = new Map<string, string>();
+
 app.post("/task", limiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { description, budgetEth = "0.05", durationDays = 7, capabilities } = req.body as {
@@ -32,6 +35,10 @@ app.post("/task", limiter, async (req: Request, res: Response, next: NextFunctio
     if (!description?.trim()) { res.status(400).json({ error: "description is required" }); return; }
 
     const result = await runCoordinator(description, budgetEth, durationDays, capabilities);
+
+    // Store design HTML for preview endpoint
+    if (result.design) designStore.set(result.taskId.toString(), result.design);
+
     res.json({
       taskId:       result.taskId.toString(),
       agentsHired:  result.agentsHired,
@@ -44,6 +51,18 @@ app.post("/task", limiter, async (req: Request, res: Response, next: NextFunctio
       report:       result.report,
     });
   } catch (err) { next(err); }
+});
+
+// Serve design HTML as a live preview page
+app.get("/design-preview/:taskId", (req: Request, res: Response) => {
+  const html = designStore.get(req.params.taskId);
+  if (!html) { res.status(404).send("Design not found"); return; }
+  // Ensure it's a complete HTML document
+  const full = html.trim().startsWith("<!DOCTYPE") || html.trim().startsWith("<html")
+    ? html
+    : `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Design Preview</title></head><body>${html}</body></html>`;
+  res.setHeader("Content-Type", "text/html");
+  res.send(full);
 });
 
 /**

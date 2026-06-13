@@ -72,10 +72,10 @@ export interface TaskResult {
   research?: string;
   riskAnalysis?: string;
   coding?: string;
-  design?: string;       // HTML content for visual preview
-  designHtml?: string;   // alias kept for clarity
+  design?: string;
   audit?: string;
   report: string;
+  previewUrl?: string;
   agentsHired: Address[];
   txHashes: `0x${string}`[];
 }

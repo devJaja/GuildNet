@@ -4,7 +4,8 @@ services:
     runtime: node
     rootDir: backend
     buildCommand: npm install && npm run build
-    startCommand: npm start
+    startCommand: node dist/server.js
+    branch: fix/a2a-payment-flow
     envVars:
       - key: NODE_ENV
         value: production

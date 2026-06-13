@@ -36,7 +36,9 @@ const agentRunner_1 = require("./agentRunner");
 const builder_1 = require("./builder");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)({
-    origin: process.env.ALLOWED_ORIGIN ?? "*",
+    origin: process.env.ALLOWED_ORIGIN
+        ? process.env.ALLOWED_ORIGIN.split(",")
+        : ["https://guild-net-plum.vercel.app", "http://localhost:3001", "http://localhost:3000"],
     methods: ["GET", "POST"],
 }));
 app.use(express_1.default.json());

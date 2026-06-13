@@ -6,7 +6,7 @@ export const CONTRACTS = {
 
 export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? 8453);
 
-export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:3000";
+export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "https://guildnet.onrender.com";
 
 export const CAPABILITIES = ["research", "risk", "coding", "design", "audit", "report"] as const;
 export type Capability = typeof CAPABILITIES[number];

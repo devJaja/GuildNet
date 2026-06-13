@@ -9,7 +9,9 @@ import { buildProject } from "./builder";
 
 const app = express();
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN ?? "*",
+  origin: process.env.ALLOWED_ORIGIN
+    ? process.env.ALLOWED_ORIGIN.split(",")
+    : ["https://guild-net-plum.vercel.app", "http://localhost:3001", "http://localhost:3000"],
   methods: ["GET", "POST"],
 }));
 app.use(express.json());

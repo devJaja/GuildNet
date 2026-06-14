@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bot, ExternalLink, CheckCircle, AlertCircle, Loader2, ShieldCheck, ShieldX, Trash2 } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { useWallets } from "@privy-io/react-auth";
@@ -38,6 +39,7 @@ export default function RegisterPage() {
 
   const { connected, address, connect } = useWallet();
   const { wallets } = useWallets();
+  const router = useRouter();
 
   async function verifyEndpoint() {
     if (!endpoint.trim()) return;
@@ -94,6 +96,10 @@ export default function RegisterPage() {
       // Wait for confirmation
       await publicClient.waitForTransactionReceipt({ hash });
       setConfirmed(true);
+      // Navigate to agents page after 1.5s so user sees the confirmation
+      if (mode !== "deactivate") {
+        setTimeout(() => router.push("/agents"), 1500);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally { setLoading(false); }

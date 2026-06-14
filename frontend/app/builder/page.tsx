@@ -1,8 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Wand2, Loader2, CheckCircle, AlertCircle, FileCode, ExternalLink, Monitor, Sparkles } from "lucide-react";
-import { BACKEND_URL } from "@/lib/constants";
+import { Wand2, Loader2, CheckCircle, AlertCircle, FileCode, ExternalLink, Monitor, Sparkles, Link2 } from "lucide-react";
+import { BACKEND_URL, CONTRACTS } from "@/lib/constants";
+import { useWallet } from "@/hooks/use-wallet";
+import { useWallets } from "@privy-io/react-auth";
+import { createWalletClient, custom, encodeFunctionData } from "viem";
+
+const baseSepolia = { id: 84532, name: "Base Sepolia", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: ["https://sepolia.base.org"] } } } as const;
+
+const CREATE_TASK_ABI = [{
+  name: "createTask", type: "function", stateMutability: "payable",
+  inputs: [{ name: "description", type: "string" }, { name: "duration", type: "uint256" }],
+  outputs: [{ name: "", type: "uint256" }],
+}] as const;
 
 interface BuildResult {
   success: boolean;
@@ -11,6 +22,7 @@ interface BuildResult {
   plan: { stack: string; description: string; devCmd: string };
   files: { path: string; size: number }[];
   buildLog: string;
+  html?: string; // single-file HTML output
 }
 
 const EXAMPLES = [
@@ -23,27 +35,51 @@ const EXAMPLES = [
 ];
 
 const STAGES = [
+  { icon: "⛓️", label: "Creating task on-chain" },
   { icon: "🏗️", label: "Architecting structure" },
   { icon: "💻", label: "Writing all files" },
   { icon: "🎨", label: "Polishing UI design" },
-  { icon: "📦", label: "Building project" },
-  { icon: "🚀", label: "Starting live preview" },
+  { icon: "✅", label: "Reviewing & fixing" },
+  { icon: "🚀", label: "Finalising output" },
 ];
 
 export default function BuilderPage() {
-  const [prompt,  setPrompt]  = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result,  setResult]  = useState<BuildResult | null>(null);
-  const [error,   setError]   = useState("");
-  const [stageIdx, setStageIdx] = useState(0);
-  const [preview, setPreview] = useState(false);
+  const [prompt,    setPrompt]    = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [result,    setResult]    = useState<BuildResult | null>(null);
+  const [error,     setError]     = useState("");
+  const [stageIdx,  setStageIdx]  = useState(0);
+  const [onChainTx, setOnChainTx] = useState("");
+
+  const { connected, address, connect } = useWallet();
+  const { wallets } = useWallets();
 
   async function handleBuild() {
     if (!prompt.trim() || loading) return;
-    setLoading(true); setResult(null); setError(""); setStageIdx(0); setPreview(false);
+    if (!connected) { connect(); return; }
 
-    let si = 0;
-    const ticker = setInterval(() => { si = Math.min(si + 1, STAGES.length - 1); setStageIdx(si); }, 22_000);
+    setLoading(true); setResult(null); setError(""); setStageIdx(0); setOnChainTx("");
+
+    // Stage 0: create on-chain task
+    try {
+      const wallet = wallets.find(w => w.address.toLowerCase() === address.toLowerCase()) ?? wallets[0];
+      if (wallet) {
+        await wallet.switchChain(84532);
+        const provider = await wallet.getEthereumProvider();
+        const viemWallet = createWalletClient({ account: address as `0x${string}`, transport: custom(provider) });
+        const hash = await viemWallet.sendTransaction({
+          chain: baseSepolia,
+          to: CONTRACTS.TASK_COORDINATOR,
+          data: encodeFunctionData({ abi: CREATE_TASK_ABI, functionName: "createTask", args: [prompt, BigInt(7 * 24 * 60 * 60)] }),
+          value: BigInt("3000000000000000"), // 0.003 ETH — covers coding+report agents
+        });
+        setOnChainTx(hash);
+      }
+    } catch { /* non-blocking — build proceeds even if tx fails */ }
+
+    setStageIdx(1);
+    let si = 1;
+    const ticker = setInterval(() => { si = Math.min(si + 1, STAGES.length - 1); setStageIdx(si); }, 20_000);
 
     try {
       const res = await fetch(`${BACKEND_URL}/build`, {
@@ -52,15 +88,18 @@ export default function BuilderPage() {
         signal: AbortSignal.timeout(300_000),
       });
       clearInterval(ticker);
+      setStageIdx(STAGES.length - 1);
+
       if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? res.statusText); }
-      const data: BuildResult = await res.json();
-      setResult(data);
-      if (data.previewUrl) setPreview(true);
+      setResult(await res.json());
     } catch (e: unknown) {
       clearInterval(ticker);
       setError(e instanceof Error ? e.message : String(e));
     } finally { setLoading(false); }
   }
+
+  const html = result?.html;
+  const isHtmlOutput = html && (html.startsWith("<!DOCTYPE") || html.startsWith("<html"));
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -69,19 +108,23 @@ export default function BuilderPage() {
         <p className="text-sm text-slate-400 mt-1">One sentence → a fully working, interactive website or dApp.</p>
       </div>
 
-      {/* Input card */}
+      {/* Input */}
       <div className="glass-card p-5 sm:p-6 space-y-4">
         <div className="relative">
           <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleBuild(); }}
             placeholder="Describe what you want to build..."
-            rows={3}
-            className="input-base p-4 pr-14 resize-none text-sm w-full" disabled={loading} />
+            rows={3} className="input-base p-4 pr-14 resize-none text-sm w-full" disabled={loading} />
           <button onClick={handleBuild} disabled={!prompt.trim() || loading}
             className="btn-primary absolute bottom-3 right-3 p-2.5 rounded-xl">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
           </button>
         </div>
+        {!connected && (
+          <p className="text-xs text-slate-500">
+            <button onClick={connect} className="text-cyan-400 hover:underline">Connect wallet</button> to record build on-chain
+          </p>
+        )}
         <div>
           <p className="text-[11px] text-slate-600 mb-2 uppercase tracking-wide">Try an example</p>
           <div className="flex flex-wrap gap-2">
@@ -93,6 +136,16 @@ export default function BuilderPage() {
         </div>
       </div>
 
+      {/* On-chain tx confirmation */}
+      {onChainTx && (
+        <div className="flex items-center gap-2 text-xs text-slate-400">
+          <Link2 className="w-3.5 h-3.5 text-green-400" />
+          Task recorded on-chain:
+          <a href={`https://sepolia.basescan.org/tx/${onChainTx}`} target="_blank" rel="noreferrer"
+            className="text-cyan-400 hover:underline font-mono">{onChainTx.slice(0,20)}…</a>
+        </div>
+      )}
+
       {/* Progress */}
       {loading && (
         <div className="glass-card p-5">
@@ -100,12 +153,23 @@ export default function BuilderPage() {
             <Loader2 className="w-4 h-4 text-cyan-400 animate-spin flex-shrink-0" />
             <p className="text-white text-sm font-medium">{STAGES[stageIdx].icon} {STAGES[stageIdx].label}…</p>
           </div>
-          <div className="flex gap-1.5">
-            {STAGES.map((s, i) => (
-              <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-500 ${i <= stageIdx ? "bg-cyan-500" : "bg-white/10"}`} />
+          <div className="flex gap-1.5 mb-3">
+            {STAGES.map((_, i) => (
+              <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-700 ${
+                i < stageIdx ? "bg-cyan-500" : i === stageIdx ? "bg-cyan-500/60 animate-pulse" : "bg-white/10"
+              }`} />
             ))}
           </div>
-          <p className="text-xs text-slate-500 mt-3">4 AI agents building your project · takes ~90 seconds</p>
+          <div className="space-y-1">
+            {STAGES.map((s, i) => (
+              <div key={i} className={`flex items-center gap-2 text-xs transition-colors ${
+                i < stageIdx ? "text-green-400" : i === stageIdx ? "text-white" : "text-slate-600"
+              }`}>
+                <span>{i < stageIdx ? "✓" : i === stageIdx ? "→" : "·"}</span>
+                <span>{s.icon} {s.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -124,9 +188,9 @@ export default function BuilderPage() {
             <CheckCircle className={`w-5 h-5 flex-shrink-0 ${result.success ? "text-green-400" : "text-amber-400"}`} />
             <div className="flex-1 min-w-0">
               <p className={`font-medium text-sm ${result.success ? "text-green-400" : "text-amber-400"}`}>
-                {result.success ? "Build successful!" : "Build completed with warnings"}
+                {result.success ? "Build complete!" : "Built with warnings"}
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">{result.plan.stack} · {result.files.length} files</p>
+              <p className="text-xs text-slate-500 mt-0.5">{result.plan?.stack} · {result.files.length} files</p>
             </div>
             {result.previewUrl && (
               <a href={result.previewUrl} target="_blank" rel="noreferrer"
@@ -136,23 +200,42 @@ export default function BuilderPage() {
             )}
           </div>
 
-          {/* iframe preview */}
-          {result.previewUrl && preview && (
+          {/* HTML output — live iframe */}
+          {isHtmlOutput && (
+            <div className="glass-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                  <Monitor className="w-4 h-4 text-cyan-400" />
+                  <span className="text-sm font-medium text-white">Live Preview — fully interactive</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => { const b = new Blob([html!], {type:"text/html"}); const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "app.html"; a.click(); }}
+                    className="text-xs text-slate-400 hover:text-white">↓ Download</button>
+                  <button onClick={() => { const b = new Blob([html!], {type:"text/html"}); window.open(URL.createObjectURL(b),"_blank"); }}
+                    className="text-xs text-cyan-400 hover:underline">Open fullscreen ↗</button>
+                </div>
+              </div>
+              <iframe srcDoc={html} className="w-full border-0" style={{ height: "620px" }}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups" title="Live App" />
+            </div>
+          )}
+
+          {/* Server preview */}
+          {result.previewUrl && !isHtmlOutput && (
             <div className="glass-card overflow-hidden">
               <div className="flex items-center gap-3 px-4 py-2.5 border-b border-white/[0.06]">
                 <Monitor className="w-4 h-4 text-cyan-400" />
                 <span className="text-sm font-medium text-white">Live Preview</span>
-                <button onClick={() => setPreview(false)} className="ml-auto text-slate-500 hover:text-white text-lg leading-none">×</button>
+                <code className="text-xs text-slate-500 ml-auto hidden sm:block">{result.previewUrl}</code>
               </div>
               <iframe src={result.previewUrl} className="w-full border-0" style={{ height: "580px" }}
                 title="Live Preview" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" />
             </div>
           )}
 
-          {/* Files */}
-          <details className="glass-card" open={false}>
+          <details className="glass-card">
             <summary className="px-4 py-3 text-xs font-medium text-slate-400 cursor-pointer hover:text-white select-none">
-              {result.files.length} files generated — click to expand
+              {result.files.length} files generated
             </summary>
             <div className="px-4 pb-4 space-y-1.5 border-t border-white/[0.06] pt-3">
               {result.files.map(f => (
@@ -169,12 +252,10 @@ export default function BuilderPage() {
         </div>
       )}
 
-      {/* Empty state */}
       {!loading && !result && !error && (
         <div className="glass-card p-10 text-center">
-          <Sparkles className="w-10 h-10 text-cyan-400/40 mx-auto mb-4" />
+          <Sparkles className="w-10 h-10 text-cyan-400/40 mx-auto mb-3" />
           <p className="text-slate-500 text-sm">Describe your project above and hit build.</p>
-          <p className="text-slate-600 text-xs mt-1">Works best with specific descriptions.</p>
         </div>
       )}
     </div>

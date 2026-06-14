@@ -233,13 +233,16 @@ app.post("/build", limiter, async (req: Request, res: Response, next: NextFuncti
     const { prompt } = req.body as { prompt: string };
     if (!prompt?.trim()) { res.status(400).json({ error: "prompt is required" }); return; }
     const result = await buildProject(prompt);
+    // Find single-file HTML output if generated
+    const htmlFile = result.files.find(f => f.path.endsWith(".html") && (f.content.includes("<!DOCTYPE") || f.content.includes("<html")));
     res.json({
-      success:   result.success,
-      outputDir: result.outputDir,
+      success:    result.success,
+      outputDir:  result.outputDir,
       previewUrl: result.previewUrl,
-      plan:      result.plan,
-      files:     result.files.map(f => ({ path: f.path, size: f.content.length })),
-      buildLog:  result.buildLog.slice(-2000),
+      plan:       result.plan,
+      html:       htmlFile?.content,
+      files:      result.files.map(f => ({ path: f.path, size: f.content.length })),
+      buildLog:   result.buildLog.slice(-2000),
     });
   } catch (err) { next(err); }
 });

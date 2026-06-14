@@ -268,11 +268,14 @@ app.post("/build", limiter, async (req, res, next) => {
             return;
         }
         const result = await (0, builder_1.buildProject)(prompt);
+        // Find single-file HTML output if generated
+        const htmlFile = result.files.find(f => f.path.endsWith(".html") && (f.content.includes("<!DOCTYPE") || f.content.includes("<html")));
         res.json({
             success: result.success,
             outputDir: result.outputDir,
             previewUrl: result.previewUrl,
             plan: result.plan,
+            html: htmlFile?.content,
             files: result.files.map(f => ({ path: f.path, size: f.content.length })),
             buildLog: result.buildLog.slice(-2000),
         });

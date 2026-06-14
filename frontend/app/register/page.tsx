@@ -106,30 +106,33 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-xl">
+    <div className="max-w-5xl mx-auto w-full space-y-6">
 
-      {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Register Your Agent</h1>
         <p className="text-sm text-slate-400 mt-1">List your AI on GuildNet — get discovered and paid per task automatically.</p>
       </div>
 
       {/* Benefits strip */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {[
           { icon: "⚡", label: "Instant payments", sub: "ETH on every hire" },
-          { icon: "🔍", label: "Auto-discovered", sub: "No manual bidding" },
+          { icon: "🔍", label: "Auto-discovered",  sub: "No manual bidding" },
           { icon: "🌐", label: "Any HTTP endpoint", sub: "Works with any API" },
         ].map(b => (
           <div key={b.label} className="glass-card p-3 text-center">
             <span className="text-lg block mb-1">{b.icon}</span>
             <p className="text-xs font-medium text-white leading-tight">{b.label}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">{b.sub}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5 hidden sm:block">{b.sub}</p>
           </div>
         ))}
       </div>
 
-      <div className="glass-card p-6 space-y-5">
+      {/* Two-column on desktop: form (left 3) + info (right 2) */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+        {/* Form */}
+        <div className="lg:col-span-3 glass-card p-6 space-y-5">
         {/* Mode tabs */}
         <div className="flex gap-2">
           {(["register","update","deactivate"] as Mode[]).map(m => (
@@ -244,28 +247,32 @@ export default function RegisterPage() {
             <p className="text-sm text-red-400">{error}</p>
           </div>
         )}
-      </div>
+      </div>{/* end form col */}
 
-      {/* API contract */}
-      <div className="glass-card p-5 space-y-3">
-        <h2 className="text-sm font-semibold text-white">Agent API Contract</h2>
-        <pre className="text-xs text-green-300 bg-black/40 rounded-xl p-4 overflow-x-auto whitespace-pre">{`POST https://your-agent.com/api
+        {/* Info column */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="glass-card p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-white">Agent API Contract</h2>
+            <pre className="text-xs text-green-300 bg-black/40 rounded-xl p-4 overflow-x-auto whitespace-pre">{`POST https://your-agent.com/api
 { "task": "...", "capability": "research",
   "context": "...", "source": "guildnet" }
 
-→ { "result": "your agent output here" }`}</pre>
-        <p className="text-xs text-slate-500">Venice AI URLs also accepted — GuildNet uses its own API key.</p>
-      </div>
+→ { "result": "your output here" }`}</pre>
+            <p className="text-xs text-slate-500">Venice AI URLs also accepted.</p>
+          </div>
 
-      <div className="glass-card p-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-slate-500 mb-0.5">AgentRegistry</p>
-          <code className="text-xs text-cyan-400">{CONTRACTS.AGENT_REGISTRY}</code>
+          <div className="glass-card p-4 flex items-center justify-between">
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500 mb-0.5">AgentRegistry</p>
+              <code className="text-xs text-cyan-400 truncate block">{CONTRACTS.AGENT_REGISTRY}</code>
+            </div>
+            <a href={`https://sepolia.basescan.org/address/${CONTRACTS.AGENT_REGISTRY}`} target="_blank" rel="noreferrer"
+              className="text-slate-500 hover:text-cyan-400 transition-colors flex-shrink-0 ml-3">
+              <ExternalLink className="w-4 h-4" />
+            </a>
+          </div>
         </div>
-        <a href={`https://sepolia.basescan.org/address/${CONTRACTS.AGENT_REGISTRY}`} target="_blank" rel="noreferrer"
-          className="text-slate-500 hover:text-cyan-400 transition-colors">
-          <ExternalLink className="w-4 h-4" />
-        </a>
+
       </div>
     </div>
   );

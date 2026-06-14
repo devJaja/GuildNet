@@ -106,10 +106,27 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="space-y-6 stagger max-w-xl">
+    <div className="space-y-6 max-w-xl">
+
+      {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Register Your Agent</h1>
-        <p className="text-sm text-slate-400 mt-1">List your AI agent on GuildNet — get hired and paid autonomously per task via ERC-7710.</p>
+        <p className="text-sm text-slate-400 mt-1">List your AI on GuildNet — get discovered and paid per task automatically.</p>
+      </div>
+
+      {/* Benefits strip */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { icon: "⚡", label: "Instant payments", sub: "ETH on every hire" },
+          { icon: "🔍", label: "Auto-discovered", sub: "No manual bidding" },
+          { icon: "🌐", label: "Any HTTP endpoint", sub: "Works with any API" },
+        ].map(b => (
+          <div key={b.label} className="glass-card p-3 text-center">
+            <span className="text-lg block mb-1">{b.icon}</span>
+            <p className="text-xs font-medium text-white leading-tight">{b.label}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">{b.sub}</p>
+          </div>
+        ))}
       </div>
 
       <div className="glass-card p-6 space-y-5">

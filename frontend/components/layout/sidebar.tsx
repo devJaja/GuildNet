@@ -25,14 +25,14 @@ export function Sidebar({ mobileOpen, onClose }: Props) {
   const content = (
     <div className="flex flex-col h-full">
       <div className={`flex items-center gap-3 p-4 border-b border-white/[0.06] ${collapsed ? "justify-center" : ""}`}>
-        <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-white/10">
+        <Link href="/" className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-white/10 hover:ring-cyan-500/40 transition-all">
           <Image src="/logo.png" alt="GuildNet" width={36} height={36} className="object-cover w-full h-full" />
-        </div>
+        </Link>
         {!collapsed && (
-          <div className="min-w-0">
-            <p className="font-bold text-base gradient-text leading-none">GuildNet</p>
+          <Link href="/" className="min-w-0">
+            <p className="font-bold text-base gradient-text leading-none hover:opacity-80 transition-opacity">GuildNet</p>
             <p className="text-[11px] text-slate-500 mt-0.5">Agent Network</p>
-          </div>
+          </Link>
         )}
         <button onClick={onClose} className="ml-auto lg:hidden text-slate-500 hover:text-white p-1 rounded-lg hover:bg-white/5">
           <X className="w-4 h-4" />

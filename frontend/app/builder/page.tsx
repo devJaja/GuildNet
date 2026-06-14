@@ -102,7 +102,7 @@ export default function BuilderPage() {
   const isHtmlOutput = html && (html.startsWith("<!DOCTYPE") || html.startsWith("<html"));
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-5xl mx-auto w-full">
       <div>
         <h1 className="text-2xl font-bold text-white">AI <span className="gradient-text">Builder</span></h1>
         <p className="text-sm text-slate-400 mt-1">One sentence → a fully working, interactive website or dApp.</p>

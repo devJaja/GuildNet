@@ -16,7 +16,7 @@ export default function TasksPage() {
   const { history, addTask, clearHistory } = useTaskHistory();
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-8 max-w-5xl mx-auto w-full">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">

@@ -1,56 +1,68 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
-import { CONTRACTS, CHAIN_ID, CAPABILITIES } from "@/lib/constants";
-
-const AGENTS_ONCHAIN = [
-  { capability: "research", address: "0xD14E15844ceb4dB8aaBE7F23E3e7F4097E344867", price: "0.001 ETH" },
-  { capability: "risk",     address: "0xf0055f49E6BD2cE3b12357af60540Bc8bDC4AFaC", price: "0.001 ETH" },
-  { capability: "coding",   address: "0xCDfe537F32A2A7c58aFA8aC401a13a5364643e2E", price: "0.001 ETH" },
-  { capability: "design",   address: "0x0bdd9e8b4beEF396aDea5E709F91360774672bc2", price: "0.001 ETH" },
-  { capability: "audit",    address: "0xf757fd57587263C28A387286e542A7d1F439e0fd", price: "0.001 ETH" },
-  { capability: "report",   address: "0x9FCB62Ce711F8768898A8c5Ffbff3AC2C5C51A85", price: "0.001 ETH" },
-];
+import { ExternalLink, Globe, Code2, Bot, Zap } from "lucide-react";
+import { CONTRACTS, CHAIN_ID } from "@/lib/constants";
+import { useChainAgents } from "@/hooks/use-chain-agents";
+import Link from "next/link";
 
 export default function SettingsPage() {
+  const { agents, loading } = useChainAgents();
+
   return (
-    <div className="space-y-8 animate-slide-up max-w-2xl">
+    <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
-        <p className="text-zinc-400">Network configuration and deployed contracts</p>
+        <h1 className="text-2xl font-bold text-white">Settings</h1>
+        <p className="text-sm text-slate-400 mt-1">Network and contract information</p>
       </div>
 
       {/* Network */}
-      <div className="glass-card p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white">Network</h2>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div><p className="text-zinc-500 mb-1">Chain</p><p className="text-white">Base Sepolia</p></div>
-          <div><p className="text-zinc-500 mb-1">Chain ID</p><p className="text-white">{CHAIN_ID}</p></div>
-          <div className="col-span-2"><p className="text-zinc-500 mb-1">RPC</p><p className="text-cyan-400 font-mono text-xs">https://sepolia.base.org</p></div>
-          <div className="col-span-2"><p className="text-zinc-500 mb-1">Explorer</p>
-            <a href="https://sepolia.basescan.org" target="_blank" rel="noreferrer" className="text-cyan-400 font-mono text-xs hover:underline flex items-center gap-1">
-              https://sepolia.basescan.org <ExternalLink className="w-3 h-3" />
+      <div className="glass-card p-5 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Globe className="w-4 h-4 text-cyan-400" />
+          <h2 className="text-sm font-semibold text-white">Network</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          {[
+            { label: "Chain",    value: "Base Sepolia" },
+            { label: "Chain ID", value: String(CHAIN_ID) },
+          ].map(({ label, value }) => (
+            <div key={label} className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.06]">
+              <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+              <p className="text-white font-medium">{value}</p>
+            </div>
+          ))}
+          <div className="sm:col-span-2 bg-white/[0.03] rounded-xl p-3 border border-white/[0.06]">
+            <p className="text-xs text-slate-500 mb-0.5">Explorer</p>
+            <a href="https://sepolia.basescan.org" target="_blank" rel="noreferrer"
+              className="text-cyan-400 text-sm hover:underline flex items-center gap-1">
+              sepolia.basescan.org <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         </div>
       </div>
 
       {/* Contracts */}
-      <div className="glass-card p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white">Deployed Contracts</h2>
-        <div className="space-y-3">
+      <div className="glass-card p-5 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Code2 className="w-4 h-4 text-violet-400" />
+          <h2 className="text-sm font-semibold text-white">Deployed Contracts</h2>
+        </div>
+        <div className="space-y-2">
           {[
-            { label: "AgentRegistry",    addr: CONTRACTS.AGENT_REGISTRY    },
-            { label: "GuildPermissions", addr: CONTRACTS.GUILD_PERMISSIONS },
-            { label: "TaskCoordinator",  addr: CONTRACTS.TASK_COORDINATOR  },
-          ].map(({ label, addr }) => (
-            <div key={label} className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm text-white">{label}</p>
-                <code className="text-xs text-zinc-500">{addr}</code>
+            { label: "AgentRegistry",    addr: CONTRACTS.AGENT_REGISTRY,    desc: "On-chain directory of agents" },
+            { label: "GuildPermissions", addr: CONTRACTS.GUILD_PERMISSIONS, desc: "ERC-7710 spend permissions" },
+            { label: "TaskCoordinator",  addr: CONTRACTS.TASK_COORDINATOR,  desc: "Hires agents, routes payments" },
+          ].map(({ label, addr, desc }) => (
+            <div key={label} className="flex items-center justify-between gap-3 p-3 bg-white/[0.03] rounded-xl border border-white/[0.06]">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-white">{label}</p>
+                <p className="text-xs text-slate-500">{desc}</p>
+                <code className="text-[11px] text-slate-600 truncate block mt-0.5">
+                  {addr?.slice(0,12)}…{addr?.slice(-6)}
+                </code>
               </div>
               <a href={`https://sepolia.basescan.org/address/${addr}`} target="_blank" rel="noreferrer"
-                className="text-zinc-500 hover:text-cyan-400 transition-colors flex-shrink-0">
+                className="text-slate-500 hover:text-cyan-400 transition-colors flex-shrink-0">
                 <ExternalLink className="w-4 h-4" />
               </a>
             </div>
@@ -58,37 +70,38 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Registered agents */}
-      <div className="glass-card p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white">Registered Agents</h2>
-        <div className="space-y-3">
-          {AGENTS_ONCHAIN.map(a => (
-            <div key={a.capability} className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="px-2 py-0.5 text-xs bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-md capitalize">{a.capability}</span>
-                <code className="text-xs text-zinc-400">{a.address.slice(0,10)}…{a.address.slice(-6)}</code>
-              </div>
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <span className="text-xs text-zinc-500">{a.price}</span>
-                <a href={`https://sepolia.basescan.org/address/${a.address}`} target="_blank" rel="noreferrer"
-                  className="text-zinc-500 hover:text-cyan-400 transition-colors">
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              </div>
-            </div>
-          ))}
+      {/* Live agents from chain */}
+      <div className="glass-card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bot className="w-4 h-4 text-green-400" />
+            <h2 className="text-sm font-semibold text-white">Active Agents</h2>
+          </div>
+          <Link href="/agents" className="text-xs text-cyan-400 hover:underline">View all →</Link>
         </div>
-      </div>
-
-      {/* Pipeline */}
-      <div className="glass-card p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white">Default Pipeline</h2>
-        <div className="flex flex-wrap gap-2">
-          {CAPABILITIES.map(cap => (
-            <span key={cap} className="px-3 py-1.5 text-xs border border-white/10 bg-white/5 text-zinc-400 rounded-lg capitalize">{cap}</span>
-          ))}
-        </div>
-        <p className="text-xs text-zinc-500">Order: research → risk → coding → design → audit → report</p>
+        {loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-10 rounded-xl" />)}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {agents.map(a => (
+              <div key={a.name} className="flex items-center justify-between gap-3 p-3 bg-white/[0.03] rounded-xl border border-white/[0.06]">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                  <span className="text-sm text-white capitalize truncate">{a.name}</span>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-xs text-slate-500">{a.price} ETH</span>
+                  <span className="text-xs text-slate-600">{a.tasks} tasks</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <Link href="/register" className="flex items-center justify-center gap-2 w-full py-2.5 text-xs text-slate-400 border border-white/[0.08] rounded-xl hover:text-white hover:bg-white/[0.04] transition-all">
+          <Zap className="w-3.5 h-3.5" /> Register your own agent
+        </Link>
       </div>
     </div>
   );

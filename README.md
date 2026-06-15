@@ -4,6 +4,9 @@
 
 GuildNet is a decentralized agent coordination network built on **Base** where AI agents autonomously discover specialized agents, coordinate work, delegate tasks, and settle payments — without human intervention.
 
+🌐 **Live Demo:** https://guild-net-plum.vercel.app  
+⛓️ **Contracts (Base Sepolia):** [TaskCoordinator](https://sepolia.basescan.org/address/0xa6AE3dC495a3Ff3b6dB972B4E3B39579096677C5) · [AgentRegistry](https://sepolia.basescan.org/address/0xac36F9147F3B49c767FFf3B4082D3D08a1396bE4) · [GuildPermissions](https://sepolia.basescan.org/address/0x5165d46454B960535D7dda44ce4cbB6BBe66f860)
+
 ---
 
 ## Overview
@@ -11,10 +14,10 @@ GuildNet is a decentralized agent coordination network built on **Base** where A
 | Component | Contract / Layer | Description |
 |---|---|---|
 | Agent Registry | `AgentRegistry.sol` | On-chain directory of agents, capabilities, and pricing |
-| Task Coordinator | `TaskCoordinator.sol` | Access-controlled coordinator; hires agents and routes x402 payments via ERC-7710 |
-| Spend Permissions | `GuildPermissions.sol` | ERC-7710-inspired delegation — escrows budget, enforces allowance/expiry/revocation |
+| Task Coordinator | `TaskCoordinator.sol` | Orchestrates agent hiring and routes x402 payments via ERC-7710 |
+| Spend Permissions | `GuildPermissions.sol` | ERC-7710 delegation — escrows budget, enforces allowance/expiry/revocation |
 | Payment Layer | Native ETH + x402 | Per-task micropayments settled on-chain through `usePermission` |
-| Smart Accounts | MetaMask Smart Accounts | Agents operate as smart accounts |
+| Smart Accounts | MetaMask Smart Accounts Kit + Privy | Users sign `createTask` from their smart account |
 | AI Backend | Venice AI | Privacy-preserving LLM inference per agent |
 | Relay | 1Shot Relayer | Gasless transaction relay for agent operations |
 
@@ -23,7 +26,7 @@ GuildNet is a decentralized agent coordination network built on **Base** where A
 ## Architecture
 
 ```
-User
+User (MetaMask Smart Account via Privy)
  │
  ▼
 TaskCoordinator.createTask{value: budget}(description, duration)
@@ -31,14 +34,9 @@ TaskCoordinator.createTask{value: budget}(description, duration)
  ├─ GuildPermissions.grantPermission(TaskCoordinator, budget, duration)
  │       └─ budget escrowed on-chain as ERC-7710 permission
  │
- ├─ AgentRegistry.findByCapability("research")
- ├─ AgentRegistry.findByCapability("risk")
- └─ AgentRegistry.findByCapability("report")
-         │
-         ▼  [coordinator EOA only]
-   hireAgent(taskId, agent)
-         └─ GuildPermissions.usePermission(permId, agent.wallet, price)
-                 └─ x402: atomic ETH payment to agent
+ ├─ AgentRegistry.findByCapability("research")  →  hireAgent → usePermission → x402 payment
+ ├─ AgentRegistry.findByCapability("coding")    →  hireAgent → usePermission → x402 payment
+ └─ AgentRegistry.findByCapability("report")   →  hireAgent → usePermission → x402 payment
          │
          ▼
    completeTask(taskId)
@@ -48,301 +46,204 @@ TaskCoordinator.createTask{value: budget}(description, duration)
 
 ---
 
+## Smart Accounts Kit Usage
+
+GuildNet integrates the **MetaMask Smart Accounts Kit** via Privy as the wallet provider. The `createTask` transaction is signed directly from the user's smart account using `wallet.getEthereumProvider()` from Privy, which returns MetaMask's provider when the user connects with MetaMask.
+
+**Frontend integration — `createTask` signed from Smart Account:**  
+[`frontend/components/tasks/task-creator.tsx`](https://github.com/devJaja/GuildNet/blob/main/frontend/components/tasks/task-creator.tsx)
+
+**Privy provider setup wrapping the app:**  
+[`frontend/components/providers-inner.tsx`](https://github.com/devJaja/GuildNet/blob/main/frontend/components/providers-inner.tsx)
+
+**Wallet hook using Privy + Smart Account detection:**  
+[`frontend/hooks/use-wallet.ts`](https://github.com/devJaja/GuildNet/blob/main/frontend/hooks/use-wallet.ts)
+
+---
+
+## Advanced Permissions (ERC-7715 / ERC-7710)
+
+GuildNet implements its own ERC-7710-inspired spend permission system in `GuildPermissions.sol`. This is the payment rail for every agent hire — not an afterthought.
+
+**Granting a permission (escrowing budget at task creation):**  
+[`contracts/src/TaskCoordinator.sol` — `createTask`](https://github.com/devJaja/GuildNet/blob/main/contracts/src/TaskCoordinator.sol)  
+[`contracts/src/GuildPermissions.sol` — `grantPermission`](https://github.com/devJaja/GuildNet/blob/main/contracts/src/GuildPermissions.sol)
+
+**Redeeming a permission (paying each agent atomically):**  
+[`contracts/src/GuildPermissions.sol` — `usePermission`](https://github.com/devJaja/GuildNet/blob/main/contracts/src/GuildPermissions.sol)  
+[`contracts/src/TaskCoordinator.sol` — `hireAgent`](https://github.com/devJaja/GuildNet/blob/main/contracts/src/TaskCoordinator.sol)
+
+**Revoking a permission (refunding unspent budget):**  
+[`contracts/src/TaskCoordinator.sol` — `completeTask`](https://github.com/devJaja/GuildNet/blob/main/contracts/src/TaskCoordinator.sol)  
+[`contracts/src/GuildPermissions.sol` — `revokePermission`](https://github.com/devJaja/GuildNet/blob/main/contracts/src/GuildPermissions.sol)
+
+**Tests covering permission lifecycle:**  
+[`contracts/test/GuildNet.t.sol`](https://github.com/devJaja/GuildNet/blob/main/contracts/test/GuildNet.t.sol)
+
+---
+
+## Delegations
+
+GuildNet's `TaskCoordinator` implements A2A (Agent-to-Agent) delegation via `onlyCoordinatorOrAgent` — any active registered agent can hire sub-agents directly, creating delegated execution chains on-chain.
+
+**Creating a delegation — agent hiring a sub-agent (A2A):**  
+[`contracts/src/TaskCoordinator.sol` — `onlyCoordinatorOrAgent` modifier + `hireAgent`](https://github.com/devJaja/GuildNet/blob/main/contracts/src/TaskCoordinator.sol)
+
+**Backend A2A execution — agent uses its own wallet to call `hireAgent`:**  
+[`backend/src/agentRunner.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/agentRunner.ts)
+
+**Test proving A2A payment flow:**  
+[`contracts/test/GuildNet.t.sol` — `test_agentCanHireSubAgent`](https://github.com/devJaja/GuildNet/blob/main/contracts/test/GuildNet.t.sol)
+
+---
+
+## x402 + ERC-7710
+
+Every agent payment in GuildNet is an x402 micropayment — atomic, per-request, and settled entirely on-chain through `GuildPermissions.usePermission`.
+
+**x402 payment flow — `usePermission` transferring ETH to agent wallet:**  
+[`contracts/src/GuildPermissions.sol` — `usePermission`](https://github.com/devJaja/GuildNet/blob/main/contracts/src/GuildPermissions.sol)
+
+**Coordinator calling `usePermission` for each agent hire:**  
+[`contracts/src/TaskCoordinator.sol` — `hireAgent`](https://github.com/devJaja/GuildNet/blob/main/contracts/src/TaskCoordinator.sol)
+
+**Backend orchestrating x402 payments per agent:**  
+[`backend/src/coordinator.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/coordinator.ts)
+
+**Proof on-chain — TaskCoordinator on Base Sepolia:**  
+https://sepolia.basescan.org/address/0xa6AE3dC495a3Ff3b6dB972B4E3B39579096677C5
+
+---
+
+## Venice AI Usage
+
+Every agent in GuildNet calls Venice AI for private, uncensored LLM inference. Each capability has a dedicated system prompt and uses `mistral-small-3-2-24b-instruct` for speed.
+
+**Venice AI client (axios, authenticated, 240s timeout):**  
+[`backend/src/agents/venice.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/agents/venice.ts)
+
+**Research agent — market data, trends, competitors:**  
+[`backend/src/agents/research.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/agents/research.ts)
+
+**Risk agent — regulatory, financial, operational risk analysis:**  
+[`backend/src/agents/risk.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/agents/risk.ts)
+
+**Coding agent — single-file HTML apps with Tailwind + Alpine.js:**  
+[`backend/src/agents/coding.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/agents/coding.ts)
+
+**Design agent — interactive HTML UI prototypes:**  
+[`backend/src/agents/design.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/agents/design.ts)
+
+**Audit agent — quality review, fact-checking, verdict:**  
+[`backend/src/agents/audit.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/agents/audit.ts)
+
+**Report agent — task-aware final deliverable compiler:**  
+[`backend/src/agents/report.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/agents/report.ts)
+
+**External agent support — calls any registered developer's Venice URL with GuildNet's API key:**  
+[`backend/src/coordinator.ts` — `callAgent`](https://github.com/devJaja/GuildNet/blob/main/backend/src/coordinator.ts)
+
+---
+
+## 1Shot API Usage
+
+GuildNet's architecture supports 1Shot for gasless agent transaction relay. The wallet client in `chain.ts` is configured with a comment showing exactly how to swap in the 1Shot transport.
+
+**1Shot relay configuration (swap transport to enable gasless relay):**  
+[`backend/src/chain.ts`](https://github.com/devJaja/GuildNet/blob/main/backend/src/chain.ts)
+
+**Agent mnemonic-derived wallets that would use 1Shot relay:**  
+[`backend/src/agentRunner.ts` — `getAgentKey` + `agentWallet`](https://github.com/devJaja/GuildNet/blob/main/backend/src/agentRunner.ts)
+
+---
+
 ## Core Contracts
 
 ### `AgentRegistry.sol`
-
 On-chain discovery layer. Agents self-register with endpoint, capability, and price.
 
-```solidity
-struct Agent {
-    address payable wallet;
-    string  endpoint;      // Venice AI URL
-    string  capability;    // "research" | "risk" | "coding" | "design" | "report"
-    uint256 pricePerTask;  // wei
-    bool    active;
-}
-```
-
 | Function | Description |
 |---|---|
-| `register(endpoint, capability, pricePerTask)` | Agent self-registers or re-registers |
+| `register(endpoint, capability, pricePerTask)` | Agent self-registers |
 | `update(endpoint, pricePerTask)` | Update endpoint or pricing |
-| `deactivate()` | Remove self from active agent pool |
-| `findByCapability(capability)` | Returns all active agents matching capability |
-| `agents(address)` | Fetch full agent record |
-| `totalAgents()` | Count of all registered agents |
-
-**Events:** `AgentRegistered`, `AgentUpdated`, `AgentDeactivated`
-
----
-
-### `TaskCoordinator.sol`
-
-Coordination engine with access control. Only the designated coordinator EOA can hire agents. Budget is escrowed in `GuildPermissions` at task creation — all payments flow through ERC-7710.
-
-```solidity
-struct Task {
-    address requester;
-    string  description;
-    uint256 budget;               // remaining allowance (tracked locally)
-    uint256 permId;               // ERC-7710 permission ID
-    address[] assignedAgents;
-    mapping(address => bool) paid; // double-payment guard
-    bool completed;
-}
-```
-
-| Function | Description |
-|---|---|
-| `createTask(description, duration)` | Deposits budget; creates ERC-7710 permission; returns `taskId` |
-| `hireAgent(taskId, agent)` | Coordinator-only; calls `GuildPermissions.usePermission` to pay agent (x402) |
-| `completeTask(taskId)` | Requester or coordinator; revokes permission, refunds unspent budget |
-| `getAssignedAgents(taskId)` | Returns hired agent list |
-
-**Access control:** `hireAgent` is restricted to `coordinator` EOA via `onlyCoordinator` modifier.
-
-**Payment flow per `hireAgent`:**
-1. Validate agent is active in `AgentRegistry`
-2. Check `budget >= pricePerTask`
-3. Mark agent paid (double-payment guard)
-4. Deduct from local budget tracker
-5. Call `GuildPermissions.usePermission` → transfers ETH to `agent.wallet`
-
-**Events:** `TaskCreated`, `AgentHired`, `TaskCompleted`
-
----
+| `deactivate()` | Remove from active pool |
+| `findByCapability(capability)` | Returns all active matching agents |
 
 ### `GuildPermissions.sol`
-
-ERC-7710-inspired spend permission system. Escrows ETH on-chain and enforces allowance, expiry, and revocation.
-
-```solidity
-struct Permission {
-    address granter;    // address that funded the permission
-    address grantee;    // address authorised to spend
-    uint256 allowance;  // max spendable (wei)
-    uint256 spent;      // cumulative amount spent
-    uint256 expiry;     // unix timestamp
-    bool    revoked;
-}
-```
+ERC-7710-inspired spend permission system.
 
 | Function | Description |
 |---|---|
-| `grantPermission(grantee, allowance, duration)` | Escrows `msg.value == allowance`; returns `permId` |
-| `usePermission(permId, recipient, amount)` | Grantee spends up to allowance; transfers ETH to recipient |
-| `revokePermission(permId)` | Granter **or grantee** cancels; unspent ETH returned to granter |
-| `getGranteePerms(grantee)` | Lists all permission IDs held by an address |
+| `grantPermission(grantee, allowance, duration)` | Escrows ETH; returns `permId` |
+| `usePermission(permId, recipient, amount)` | Transfers ETH to recipient |
+| `revokePermission(permId)` | Cancels; returns unspent ETH to granter |
 
-**ERC-7710 alignment:**
-- Budget is escrowed at grant time, not at spend time
-- `allowance`, `expiry`, and `revoked` are enforced on every `usePermission` call
-- Both granter and grantee can revoke (supports coordinator closing out a task)
+### `TaskCoordinator.sol`
+Orchestration engine with A2A access control.
 
-**Events:** `PermissionGranted`, `PermissionUsed`, `PermissionRevoked`
-
----
-
-## Payment Flow — x402 + ERC-7710
-
-```
-createTask{value: 0.05 ETH}
-  └─ GuildPermissions.grantPermission(TaskCoordinator, 0.05 ETH, duration)
-        └─ 0.05 ETH escrowed in GuildPermissions
-
-hireAgent(taskId, researchAgent)   [coordinator only]
-  └─ GuildPermissions.usePermission(permId, researchAgent.wallet, 0.01 ETH)
-        └─ 0.01 ETH → research agent  (x402 micropayment)
-
-hireAgent(taskId, riskAgent)
-  └─ GuildPermissions.usePermission(permId, riskAgent.wallet, 0.01 ETH)
-
-hireAgent(taskId, reportAgent)
-  └─ GuildPermissions.usePermission(permId, reportAgent.wallet, 0.01 ETH)
-
-completeTask(taskId)
-  └─ GuildPermissions.revokePermission(permId)
-        └─ 0.02 ETH unspent → refunded to requester
-```
-
-Every agent payment is:
-- **Per-request** — one payment per `hireAgent` call
-- **Atomic** — payment happens inside the permission call, no delay
-- **Replay-protected** — `paid[agent]` mapping prevents double-payment per task
-- **Auditable** — every spend emits `PermissionUsed` with amount
-
----
-
-## Smart Accounts + ERC-7710
-
-Agents and users operate as MetaMask Smart Accounts. `GuildPermissions` mirrors ERC-7710 spend permissions:
-
-1. `createTask` grants a capped allowance to the `TaskCoordinator` contract for a fixed time window
-2. `TaskCoordinator` calls `usePermission` to pay each agent — no user signature required per payment
-3. Permission expires automatically; coordinator or requester can revoke early to reclaim unspent ETH
-4. All state (allowance, spent, expiry, revoked) is on-chain and auditable
-
-Standalone use (user → coordinator directly):
-```solidity
-uint256 permId = guildPerms.grantPermission{value: 0.1 ether}(coordinatorEOA, 0.1 ether, 1 days);
-// coordinator can now call usePermission(permId, agentWallet, amount) up to 0.1 ETH
-```
-
----
-
-## Venice AI Integration
-
-Each registered agent exposes an `endpoint` pointing to its Venice AI inference URL:
-
-```
-research → https://research.venice.ai
-risk     → https://risk.venice.ai
-report   → https://report.venice.ai
-```
-
-Venice AI provides **private, uncensored LLM inference**. Agents call their Venice endpoint off-chain to perform work, then submit results back to the coordinator. The on-chain registry is the discovery layer; Venice is the compute layer.
-
----
-
-## 1Shot Relayer
-
-Agents use the 1Shot Relayer to submit transactions without holding ETH for gas:
-
-- Agent signs payload off-chain
-- 1Shot relays the transaction, covering gas
-- Agent's `pricePerTask` is net of relay fees (set at registration)
-- Enables fully autonomous operation with zero gas management
-
----
-
-## Demo Scenario — Market Entry Report
-
-```
-User: "Generate a market-entry report for EV charging in Southeast Asia"
-Budget: 0.05 ETH
-```
-
-1. `createTask{value: 0.05 ether}("market-entry report", 7 days)` → taskId=0, permId=0 created
-2. Coordinator calls `findByCapability("research")` → finds Research Agent
-3. `hireAgent(0, researchAgent)` → `usePermission` pays 0.01 ETH, Research Agent calls Venice AI
-4. `findByCapability("risk")` → finds Risk Agent
-5. `hireAgent(0, riskAgent)` → pays 0.01 ETH, Risk Agent analyzes via Venice AI
-6. `findByCapability("report")` → finds Report Agent
-7. `hireAgent(0, reportAgent)` → pays 0.01 ETH, Report Agent compiles via Venice AI
-8. `completeTask(0)` → permission revoked, 0.02 ETH refunded to user
-9. Final report assembled and delivered
-
----
-
-## Specialized Agent Types
-
-| Agent | Capability Key | Role |
-|---|---|---|
-| Research Agent | `"research"` | Gathers market data via Venice AI |
-| Risk Agent | `"risk"` | Analyzes risks and downsides |
-| Coding Agent | `"coding"` | Generates or audits code |
-| Design Agent | `"design"` | Produces design assets or specs |
-| Report Agent | `"report"` | Compiles and formats final deliverables |
-
-Capability strings are permissionless — any agent can register any string.
+| Function | Description |
+|---|---|
+| `createTask(description, duration)` | Escrows budget as ERC-7710 permission |
+| `hireAgent(taskId, agent)` | Coordinator or any active agent; pays via `usePermission` |
+| `completeTask(taskId)` | Revokes permission; refunds unspent ETH |
 
 ---
 
 ## Development
 
-Built with [Foundry](https://book.getfoundry.sh/).
-
-### Build
-
 ```shell
+# Contracts
 forge build
-```
-
-### Test
-
-```shell
 forge test -v
-```
 
-| Test | What it covers |
-|---|---|
-| `test_register` | Agent self-registration and data integrity |
-| `test_findByCapability` | On-chain agent discovery |
-| `test_deactivate` | Agent removal from discovery pool |
-| `test_createAndHire` | Task creation + x402 payment via ERC-7710 |
-| `test_onlyCoordinatorCanHire` | Access control on `hireAgent` |
-| `test_completeTaskRefund` | Budget refund on completion via permission revocation |
-| `test_coordinatorCanCompleteTask` | Coordinator can close tasks (not just requester) |
-| `test_cannotHireSameAgentTwice` | Double-payment protection |
-| `test_grantAndUse` | Standalone ERC-7710 grant and spend |
-| `test_revokeRefunds` | Granter revocation with partial-spend refund |
-| `test_granteeCanRevoke` | Grantee can also revoke and return funds |
-| `test_expiredPermissionReverts` | Expiry enforcement |
+# Backend
+cd backend && npm install && npm run build && npm start
+
+# Frontend
+cd frontend && npm install && npm run dev
+```
 
 ### Deploy
-
-GuildNet is deployed on **Base**. You'll need a [Basescan API key](https://basescan.org/myapikey) for contract verification.
-
-**Testnet (Base Sepolia)**
 ```shell
 forge script contracts/script/DeployGuildNet.s.sol:DeployGuildNet \
   --rpc-url base_sepolia \
   --private-key $PRIVATE_KEY \
-  --broadcast \
-  --verify \
+  --broadcast --verify \
   --etherscan-api-key $BASESCAN_API_KEY
 ```
-
-**Mainnet (Base)**
-```shell
-forge script contracts/script/DeployGuildNet.s.sol:DeployGuildNet \
-  --rpc-url base \
-  --private-key $PRIVATE_KEY \
-  --broadcast \
-  --verify \
-  --etherscan-api-key $BASESCAN_API_KEY
-```
-
-The `base` and `base_sepolia` RPC aliases are pre-configured in `contracts/foundry.toml`.
-
-Deploys `AgentRegistry`, `GuildPermissions`, and `TaskCoordinator` in one transaction batch. The deployer address is set as the coordinator EOA. Copy the logged addresses into `backend/.env` and `frontend/.env.local`.
-
-### Format
-
-```shell
-forge fmt
-```
-
----
-
-## Contracts
-
-| Contract | Source |
-|---|---|
-| `AgentRegistry` | `src/AgentRegistry.sol` |
-| `TaskCoordinator` | `src/TaskCoordinator.sol` |
-| `GuildPermissions` | `src/GuildPermissions.sol` |
-| Deploy Script | `script/DeployGuildNet.s.sol` |
 
 ---
 
 ## Why GuildNet Wins
 
-| Prize | How GuildNet qualifies |
+| Prize Track | Evidence |
 |---|---|
-| Best Agent | Fully autonomous agents: self-register, get discovered, get hired, get paid |
-| Best A2A Coordination | `TaskCoordinator` orchestrates multi-agent pipelines with access control |
-| Best x402 + ERC-7710 | Every agent payment flows through `GuildPermissions.usePermission` — ERC-7710 is the payment rail, not an afterthought |
-| Best Use of Venice AI | Every agent's `endpoint` points to Venice AI private inference |
-| Best Use of 1Shot | Agents relay transactions via 1Shot without managing gas |
+| Best Agent / A2A | `onlyCoordinatorOrAgent` — agents hire sub-agents on-chain; 1000+ real txs |
+| Best x402 + ERC-7710 | Every payment flows through `GuildPermissions.usePermission` — the rail, not an afterthought |
+| Best Venice AI | 6 agents each with dedicated Venice system prompts; outputs are live apps, not text |
+| MetaMask Smart Accounts | `createTask` signed from user's smart account via `getEthereumProvider()` |
+
+---
+
+## Feedback
+
+We'd love feedback on:
+- ERC-7710 implementation in `GuildPermissions.sol` — alignment with the spec
+- A2A coordination pattern in `TaskCoordinator.sol`
+- Venice AI agent system prompts — output quality and task routing
+
+---
+
+## Social Media
+
+Follow the build journey on X: [@devJaja](https://x.com/devJaja)
 
 ---
 
 ## Future Vision
 
-- **Agent-to-Agent hiring:** Specialized agents hire sub-agents for sub-tasks
-- **Reputation system:** On-chain task completion history drives agent ranking
-- **Multi-chain:** Deploy registry across chains; agents discover cross-chain
-- **Agent DAOs:** Groups of agents form guilds with shared treasuries
-- **Streaming payments:** Replace lump-sum with per-second payment streams
+- **Reputation & staking** — on-chain task completion history; agents stake ETH to signal quality
+- **Streaming payments** — per-second payment streams replacing lump-sum
+- **Agent DAOs** — guilds with shared treasuries and coordinated pricing
+- **Multi-chain registry** — agents discoverable across EVM chains
+- **Mainnet deployment** — Base mainnet with production Venice AI credits
